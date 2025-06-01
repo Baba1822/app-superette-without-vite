@@ -67,7 +67,7 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (userData) => {
     try {
-      const response = await api.post('/auth/register', userData);
+      const response = await axios.post('http://localhost:5000/api/auth/register', userData);
       const { token } = response.data;
       localStorage.setItem('token', token);
       const decoded = jwtDecode(token);

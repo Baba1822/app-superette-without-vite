@@ -59,8 +59,8 @@ const AppRoutes = () => {
                 <Route path="/" element={<Home />} />
                 <Route path="/boutique" element={<ProductList />} />
                 <Route path="/boutique/produit/:id" element={<ProductDetails />} />
-                <Route path="/connexion" element={<Login />} />
-                <Route path="/inscription" element={<Register />} />
+                <Route path="/login" element={<Login />} />
+                <Route path="/register" element={<Register />} />
                 <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
                 <Route path="/reinitialiser-mot-de-passe/:token" element={<ResetPassword />} />
             </Route>

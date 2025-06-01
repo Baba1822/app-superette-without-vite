@@ -8,15 +8,18 @@ import {
   Grid,
   Card,
   CardContent,
-  CardMedia,
   useTheme,
   useMediaQuery,
   AppBar
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { Storefront as StorefrontIcon, ShoppingCart as CartIcon, LocalOffer as OfferIcon, Security as SecurityIcon } from '@mui/icons-material';
-import { Link as RouterLink } from 'react-router-dom';
+import { 
+  Storefront as StorefrontIcon, 
+  ShoppingCart as CartIcon, 
+  LocalOffer as OfferIcon, 
+  Security as SecurityIcon 
+} from '@mui/icons-material';
 
 const Home = () => {
   const theme = useTheme();
@@ -28,19 +31,27 @@ const Home = () => {
     {
       title: 'Produits Frais',
       description: 'Une large sélection de produits frais et de qualité.',
-      image: '/images/fresh-products.jpg'
+      icon: <CartIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
     },
     {
       title: 'Livraison Rapide',
       description: 'Livraison à domicile rapide et sécurisée.',
-      image: '/images/delivery.jpg'
+      icon: <OfferIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
     },
     {
       title: 'Programme Fidélité',
       description: 'Gagnez des points et profitez de réductions exclusives.',
-      image: '/images/loyalty.jpg'
+      icon: <SecurityIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
     }
   ];
+
+  const handleNavigation = (path) => {
+    if (isAuthenticated && (path === '/Login' || path === '/Register')) {
+      navigate('/profile');
+    } else {
+      navigate(path);
+    }
+  };
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
@@ -58,71 +69,62 @@ const Home = () => {
           <Typography variant="h5" color="text.secondary" paragraph>
             Votre superette en ligne, simple et efficace
           </Typography>
+          
           <Grid container spacing={2} justifyContent="center" sx={{ mt: 4 }}>
             <Grid item>
               <Button
                 variant="contained"
                 size="large"
-                onClick={() => navigate('/boutique')}
+                onClick={() => handleNavigation('/boutique')}
+                sx={{ minWidth: 200 }}
               >
                 Commencer vos achats
               </Button>
             </Grid>
-            <Grid item>
-              <Button
-                variant="outlined"
-                size="large"
-                onClick={() => navigate('/connexion')}
-              >
-                Se connecter
-              </Button>
-            </Grid>
+            {!isAuthenticated && (
+              <>
+                <Grid item>
+                  <Button
+                    variant="outlined"
+                    size="large"
+                    onClick={() => handleNavigation('/login')}
+                    sx={{ minWidth: 200 }}
+                  >
+                    Se connecter
+                  </Button>
+                </Grid>
+                <Grid item>
+                  <Button
+                    variant="text"
+                    size="large"
+                    onClick={() => handleNavigation('/register')}
+                    sx={{ minWidth: 200 }}
+                  >
+                    S'inscrire
+                  </Button>
+                </Grid>
+              </>
+            )}
           </Grid>
         </Box>
 
         {/* Features Grid */}
         <Grid container spacing={4}>
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <CartIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Shopping Facile
-                </Typography>
-                <Typography color="text.secondary">
-                  Parcourez notre catalogue et faites vos achats en quelques clics
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <OfferIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Offres Spéciales
-                </Typography>
-                <Typography color="text.secondary">
-                  Profitez de nos promotions et réductions exclusives
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-
-          <Grid item xs={12} md={4}>
-            <Card>
-              <CardContent sx={{ textAlign: 'center' }}>
-                <SecurityIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-                <Typography variant="h5" component="h2" gutterBottom>
-                  Paiement Sécurisé
-                </Typography>
-                <Typography color="text.secondary">
-                  Transactions sécurisées et protection de vos données
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
+          {features.map((feature, index) => (
+            <Grid item xs={12} md={4} key={index}>
+              <Card sx={{ height: '100%' }}>
+                <CardContent sx={{ textAlign: 'center', height: '100%' }}>
+                  {feature.icon}
+                  <Typography variant="h5" component="h2" gutterBottom>
+                    {feature.title}
+                  </Typography>
+                  <Typography color="text.secondary">
+                    {feature.description}
+                  </Typography>
+                </CardContent>
+              </Card>
+            </Grid>
+          ))}
         </Grid>
       </Container>
     </Box>
