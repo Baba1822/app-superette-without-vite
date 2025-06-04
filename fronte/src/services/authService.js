@@ -1,51 +1,64 @@
 import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 
 // URL de l'API backend, récupérée depuis le fichier .env ou utilisée en local par défaut
-const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 // Fonction de connexion utilisateur
 const login = async (credentials) => {
   try {
-    const response = await axios.post(`${API_URL}/auth/login`, credentials);
+    const response = await axios.post(`${API_URL}/api/auth/login`, credentials);
 
-    // Si une réponse contient un token, on le stocke dans le localStorage pour une utilisation future
     if (response.data.token) {
       localStorage.setItem('token', response.data.token);
+      // Décoder le token pour obtenir les informations de l'utilisateur
+      const decoded = jwtDecode(response.data.token);
+      localStorage.setItem('user', JSON.stringify(decoded));
     }
     
-    // Retourner la réponse contenant les informations de l'utilisateur ou le token
     return response.data;
   } catch (error) {
     // Gérer les erreurs d'authentification
     console.error('Erreur lors de la connexion', error);
-    throw error;
+    if (error.response) {
+      // Le serveur a répondu avec un statut d'erreur
+      throw new Error(error.response.data?.message || 'Erreur de connexion');
+    } else if (error.request) {
+      // La requête a été faite mais pas de réponse
+      throw new Error('Impossible de se connecter au serveur');
+    } else {
+      // Erreur dans la configuration de la requête
+      throw new Error('Erreur lors de la requête');
+    }
   }
 };
 
 // Fonction de déconnexion utilisateur
 const logout = () => {
-  // Supprimer le token du localStorage
   localStorage.removeItem('token');
+  localStorage.removeItem('user');
 };
 
-// Fonction pour obtenir l'utilisateur actuel (décoder le token ou l'utiliser tel quel)
+// Fonction pour obtenir l'utilisateur actuel
 const getCurrentUser = () => {
-  // Récupérer le token stocké
-  const token = localStorage.getItem('token');
-  if (!token) return null;
-
-  // Si tu veux décoder le token, tu peux le faire ici avec une librairie comme jwt-decode
-  // Par exemple : return jwtDecode(token);
-  return token;
+  const userStr = localStorage.getItem('user');
+  if (!userStr) return null;
+  return JSON.parse(userStr);
 };
 
-// Vérifier si l'utilisateur est authentifié (si le token existe et est valide)
+// Vérifier si l'utilisateur est authentifié
 const isAuthenticated = () => {
-  const token = getCurrentUser();
+  const token = localStorage.getItem('token');
   if (!token) return false;
-
-  // Ici, tu pourrais vérifier la validité du token, par exemple en le décodant ou en l'envoyant au backend
-  return true;
+  
+  try {
+    // Vérifier si le token est expiré
+    const decoded = jwtDecode(token);
+    const currentTime = Date.now() / 1000;
+    return decoded.exp > currentTime;
+  } catch (error) {
+    return false;
+  }
 };
 
 export default {

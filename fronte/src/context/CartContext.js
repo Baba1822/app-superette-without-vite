@@ -1,7 +1,15 @@
 import React, { createContext, useContext, useState } from 'react';
 import { toast } from 'react-toastify';
 
-const CartContext = createContext();
+const CartContext = createContext({
+  cart: [], // Valeur par défaut
+  addToCart: () => {},
+  removeFromCart: () => {},
+  updateQuantity: () => {},
+  clearCart: () => {},
+  getCartTotal: () => 0,
+  getCartItemsCount: () => 0
+});
 
 export function CartProvider({ children }) {
   const [cart, setCart] = useState([]);
@@ -11,8 +19,7 @@ export function CartProvider({ children }) {
       const existingItem = currentCart.find(item => item.id === product.id);
       
       if (existingItem) {
-        // Vérifier le stock disponible
-        if (existingItem.quantity >= product.stock) {
+        if (product.stock && existingItem.quantity >= product.stock) {
           toast.warning('Stock maximum atteint pour ce produit');
           return currentCart;
         }
@@ -41,11 +48,13 @@ export function CartProvider({ children }) {
     }
 
     setCart(currentCart =>
-      currentCart.map(item =>
-        item.id === productId
-          ? { ...item, quantity: Math.min(newQuantity, item.stock) }
-          : item
-      )
+      currentCart.map(item => {
+        if (item.id === productId) {
+          const maxQuantity = item.stock ? Math.min(newQuantity, item.stock) : newQuantity;
+          return { ...item, quantity: maxQuantity };
+        }
+        return item;
+      })
     );
   };
 
@@ -65,6 +74,7 @@ export function CartProvider({ children }) {
   return (
     <CartContext.Provider value={{
       cart,
+      cartItems: cart, // Alias pour compatibilité
       addToCart,
       removeFromCart,
       updateQuantity,

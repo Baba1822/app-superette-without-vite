@@ -1,11 +1,11 @@
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { ThemeProvider, CssBaseline } from '@mui/material';
 import { ToastContainer } from 'react-toastify';
 import 'react-toastify/dist/ReactToastify.css';
 
 import { AuthProvider } from './context/AuthContext';
+import { CartProvider } from './context/CartContext'; // Import du CartProvider
 import AppRoutes from './routes/AppRoutes';
 import theme from './theme';
 
@@ -22,7 +22,7 @@ const App = () => {
     return (
         <QueryClientProvider client={queryClient}>
             <AuthProvider>
-                <BrowserRouter>
+                <CartProvider> {/* Ajout du CartProvider ici */}
                     <ThemeProvider theme={theme}>
                         <CssBaseline />
                         <AppRoutes />
@@ -39,7 +39,7 @@ const App = () => {
                             theme="colored"
                         />
                     </ThemeProvider>
-                </BrowserRouter>
+                </CartProvider>
             </AuthProvider>
         </QueryClientProvider>
     );

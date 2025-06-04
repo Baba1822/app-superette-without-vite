@@ -1,5 +1,5 @@
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route } from 'react-router-dom';
 import PublicLayout from '../layouts/PublicLayout';
 import AdminLayout from '../layouts/AdminLayout';
 import CustomerLayout from '../layouts/CustomerLayout';
@@ -8,7 +8,7 @@ import ManagerLayout from '../layouts/ManagerLayout';
 import StockistLayout from '../layouts/StockistLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
 
-// Pages publiques
+// Public pages
 import Home from '../pages/Home';
 import Login from '../pages/auth/Login';
 import Register from '../pages/auth/Register';
@@ -17,12 +17,14 @@ import ResetPassword from '../pages/auth/ResetPassword';
 import ProductList from '../pages/client/ProductList';
 import ProductDetails from '../pages/client/ProductDetails';
 
-// Pages clients
+// Customer pages
 import Profile from '../pages/client/Profile';
 import ClientOrders from '../pages/client/Orders';
 import LoyaltyStatus from '../pages/client/LoyaltyStatus';
+import Cart from '../pages/client/cart/Cart'
+import Shop from '../pages/client/shop/Shop';
 
-// Pages admin
+// Admin pages
 import Dashboard from '../pages/admin/dashboard/Dashboard';
 import OrdersManagement from '../pages/admin/orders/OrdersManagement';
 import ProductsManagement from '../pages/admin/products/ProductsManagement';
@@ -36,20 +38,23 @@ import Settings from '../pages/admin/settings/Settings';
 import Loyalty from '../pages/admin/loyalty/Loyalty';
 import Reports from '../pages/admin/reports/Reports';
 
-// Pages caisse
+// Finance (cashier)
 import Sales from '../pages/finance/Sales';
 import Expenses from '../pages/finance/Expenses';
 import FinancialReports from '../pages/finance/Reports';
 
-// Pages stock
+// Stockist
 import InventoryReport from '../pages/inventory/InventoryReport';
 import StockManagement from '../pages/inventory/StockManagement';
 import StockMovement from '../pages/inventory/StockMovement';
 
-// Pages offres
+// Offers
 import Promotions from '../pages/offers/Promotions';
 import Discounts from '../pages/offers/Discounts';
 import SeasonalOffers from '../pages/offers/SeasonalOffers';
+
+// NotFound page
+import NotFound from '../pages/NotFound';
 
 const AppRoutes = () => {
     return (
@@ -57,8 +62,8 @@ const AppRoutes = () => {
             {/* Public routes */}
             <Route element={<PublicLayout />}>
                 <Route path="/" element={<Home />} />
-                <Route path="/boutique" element={<ProductList />} />
-                <Route path="/boutique/produit/:id" element={<ProductDetails />} />
+                <Route path="/produits-public" element={<ProductList />} />
+                <Route path="/produit/:id" element={<ProductDetails />} />
                 <Route path="/login" element={<Login />} />
                 <Route path="/register" element={<Register />} />
                 <Route path="/mot-de-passe-oublie" element={<ForgotPassword />} />
@@ -70,6 +75,10 @@ const AppRoutes = () => {
                 <Route path="/mon-profil" element={<ProtectedRoute><Profile /></ProtectedRoute>} />
                 <Route path="/mes-commandes" element={<ProtectedRoute><ClientOrders /></ProtectedRoute>} />
                 <Route path="/fidelite" element={<ProtectedRoute><LoyaltyStatus /></ProtectedRoute>} />
+                <Route path="/panier" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
+                {/* Route Shop pour les clients connectés */}
+                <Route path="/Shop" element={<ProtectedRoute><Shop /></ProtectedRoute>} />
+                <Route path="/boutique" element={<ProtectedRoute><Shop /></ProtectedRoute>} />
             </Route>
 
             {/* Admin routes */}
@@ -116,7 +125,7 @@ const AppRoutes = () => {
             </Route>
 
             {/* 404 fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
+            <Route path="*" element={<NotFound />} />
         </Routes>
     );
 };
