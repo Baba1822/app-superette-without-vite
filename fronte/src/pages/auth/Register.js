@@ -68,7 +68,9 @@ function Register() {
       });
       
       if (result?.success) {
-        navigate('/');
+        // Utiliser le chemin de redirection basé sur le rôle au lieu de naviguer vers '/'
+        const redirectPath = result.redirectPath || '/Shop'; // fallback vers /Shop pour les clients
+        navigate(redirectPath);
       }
     } catch (err) {
       console.error('Registration error:', err);

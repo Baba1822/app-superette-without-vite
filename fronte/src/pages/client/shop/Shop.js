@@ -261,7 +261,7 @@ const HomePage = () => {
   };
 
   // Filtrage des produits en fonction de la recherche et de la catégorie active
-  const filteredProducts = products.filter(product => {
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(product => {
     const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       product.description.toLowerCase().includes(searchTerm.toLowerCase());
     
