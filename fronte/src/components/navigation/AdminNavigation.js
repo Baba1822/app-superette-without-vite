@@ -21,13 +21,16 @@ import { useQuery } from '@tanstack/react-query';
 import { orderService } from '../../services/orderService';
 
 const AdminNavigation = () => {
-  // Récupération du nombre de commandes en attente
-  const { data: commandes = [] } = useQuery(['commandes'], orderService.getAllOrders, {
+  // Récupération du nombre de commandes en attente - SYNTAXE CORRIGÉE POUR v5
+  const { data: commandes = [] } = useQuery({
+    queryKey: ['commandes'],
+    queryFn: orderService.getAllOrders,
     retry: false,
     onError: (error) => {
       console.warn('Erreur lors de la récupération des commandes:', error);
     }
   });
+
   const commandesEnAttente = commandes.filter(commande => commande.status === 'en_attente').length;
 
   const elementsMenu = [
@@ -101,4 +104,4 @@ const AdminNavigation = () => {
   );
 };
 
-export default AdminNavigation; 
+export default AdminNavigation;

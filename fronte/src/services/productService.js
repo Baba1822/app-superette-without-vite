@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = '/products';
+const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const BASE_URL = `${API_BASE_URL}/products`;
 
 export const productService = {
   // Récupérer tous les produits

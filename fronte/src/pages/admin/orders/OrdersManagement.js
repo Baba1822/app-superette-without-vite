@@ -45,25 +45,23 @@ const OrdersManagement = () => {
   const [statusNote, setStatusNote] = useState('');
 
   // Charger les commandes
-  const { data: orders = [], isLoading } = useQuery(
-    ['orders'],
-    orderService.getAllOrders
-  );
+  const { data: orders = [], isLoading } = useQuery({
+    queryKey: ['orders'],
+    queryFn: orderService.getAllOrders
+  });
 
   // Mutation pour mettre à jour le statut
-  const updateStatusMutation = useMutation(
-    ({ orderId, status }) => orderService.updateOrderStatus(orderId, status),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['orders']);
-        setStatusDialogOpen(false);
-        toast.success('Statut mis à jour avec succès');
-      },
-      onError: () => {
-        toast.error('Erreur lors de la mise à jour du statut');
-      }
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ orderId, status }) => orderService.updateOrderStatus(orderId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['orders']);
+      setStatusDialogOpen(false);
+      toast.success('Statut mis à jour avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la mise à jour du statut');
     }
-  );
+  });
 
   // Formater la date
   const formatDate = (dateString) => {

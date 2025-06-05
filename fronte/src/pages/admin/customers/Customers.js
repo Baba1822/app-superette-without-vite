@@ -44,41 +44,35 @@ function Customers() {
   const [clientStats, setClientStats] = useState(null);
 
   // Récupérer la liste des clients
-  const { data: clients = [], isLoading, error } = useQuery(
-    ['clients'],
-    clientService.getAllClients,
-    {
-      staleTime: 5 * 60 * 1000
-    }
-  );
+  const { data: clients = [], isLoading, error } = useQuery({
+    queryKey: ['clients'],
+    queryFn: clientService.getAllClients,
+    staleTime: 5 * 60 * 1000
+  });
 
   // Mutation pour mettre à jour le statut d'un client
-  const updateStatusMutation = useMutation(
-    ({ id, status }) => clientService.updateClientStatus(id, status),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['clients']);
-        toast.success('Statut du client mis à jour avec succès');
-      },
-      onError: () => {
-        toast.error('Erreur lors de la mise à jour du statut');
-      }
+  const updateStatusMutation = useMutation({
+    mutationFn: ({ id, status }) => clientService.updateClientStatus(id, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['clients']);
+      toast.success('Statut du client mis à jour avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la mise à jour du statut');
     }
-  );
+  });
 
   // Mutation pour supprimer un client
-  const deleteMutation = useMutation(
-    (id) => clientService.deleteClient(id),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['clients']);
-        toast.success('Client supprimé avec succès');
-      },
-      onError: () => {
-        toast.error('Erreur lors de la suppression du client');
-      }
+  const deleteMutation = useMutation({
+    mutationFn: (id) => clientService.deleteClient(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['clients']);
+      toast.success('Client supprimé avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la suppression du client');
     }
-  );
+  });
 
   // Charger les statistiques du client
   const loadClientStats = async (clientId) => {
@@ -169,7 +163,7 @@ function Customers() {
               .map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>{client.id}</TableCell>
-                  <TableCell>{client.firstName} {client.lastName}</TableCell>
+                  <TableCell>{client?.firstName || ''} {client?.lastName || ''}</TableCell>
                   <TableCell>{client.email}</TableCell>
                   <TableCell>
                     {new Date(client.createdAt).toLocaleDateString()}
@@ -236,7 +230,7 @@ function Customers() {
                   Informations personnelles
                 </Typography>
                 <Typography>
-                  <strong>Nom:</strong> {selectedClient.firstName} {selectedClient.lastName}
+                  <strong>Nom:</strong> {selectedClient?.firstName || ''} {selectedClient?.lastName || ''}
                 </Typography>
                 <Typography>
                   <strong>Email:</strong> {selectedClient.email}

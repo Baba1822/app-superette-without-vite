@@ -3,7 +3,7 @@ import axios from 'axios';
 
 class LoyaltyService {
     constructor() {
-        this.apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+        this.apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
         this.pointsPerGNF = 0.01; // 1 point pour chaque 100 GNF dépensés
         this.pointValueInGNF = 10; // 1 point = 10 GNF de réduction
     }

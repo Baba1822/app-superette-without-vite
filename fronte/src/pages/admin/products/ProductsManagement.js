@@ -66,11 +66,7 @@ const ITEMS_PER_PAGE = 10;
 
 const ProductsManagement = () => {
   const queryClient = useQueryClient();
-  const [data, setData] = useState({
-    products: [],
-    loading: true,
-    error: null,
-  });
+// Supprimer l'état data et utiliser directement le useQuery
 
   const [filters, setFilters] = useState({
     seasonalOnly: false,
@@ -113,13 +109,21 @@ const ProductsManagement = () => {
   const [imageFile, setImageFile] = useState(null);
 
   // Load initial data
-  const { data: products = [], isLoading } = useQuery(
-    ['products'],
-    productService.getAllProducts
-  );
+  const { data: products = [], isLoading, error } = useQuery({
+    queryKey: ['products'],
+    queryFn: productService.getAllProducts
+  });
+
+  // Logs pour déboguer
+  useEffect(() => {
+    console.log('Products data:', products);
+    console.log('Loading state:', isLoading);
+    console.log('Error:', error);
+  }, [products, isLoading, error]);
 
   // Mutations for CRUD operations
-  const createMutation = useMutation(productService.createProduct, {
+  const createMutation = useMutation({
+    mutationFn: productService.createProduct,
     onSuccess: () => {
       queryClient.invalidateQueries(['products']);
       handleCloseDialog();
@@ -131,22 +135,21 @@ const ProductsManagement = () => {
     }
   });
 
-  const updateMutation = useMutation(
-    (data) => productService.updateProduct(selectedProduct.id, data),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['products']);
-        handleCloseDialog();
-        toast.success('Produit mis à jour avec succès');
-      },
-      onError: (error) => {
-        setErrors(prev => ({ ...prev, error: error.response?.data?.message || 'Erreur lors de la mise à jour' }));
-        toast.error('Erreur lors de la mise à jour');
-      }
+  const updateMutation = useMutation({
+    mutationFn: (data) => productService.updateProduct(selectedProduct.id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['products']);
+      handleCloseDialog();
+      toast.success('Produit mis à jour avec succès');
+    },
+    onError: (error) => {
+      setErrors(prev => ({ ...prev, error: error.response?.data?.message || 'Erreur lors de la mise à jour' }));
+      toast.error('Erreur lors de la mise à jour');
     }
-  );
+  });
 
-  const deleteMutation = useMutation(productService.deleteProduct, {
+  const deleteMutation = useMutation({
+    mutationFn: productService.deleteProduct,
     onSuccess: () => {
       queryClient.invalidateQueries(['products']);
       toast.success('Produit supprimé avec succès');
@@ -156,18 +159,16 @@ const ProductsManagement = () => {
     }
   });
 
-  const uploadImageMutation = useMutation(
-    ({ id, file }) => productService.uploadImage(id, file),
-    {
-      onSuccess: () => {
-        queryClient.invalidateQueries(['products']);
-        toast.success('Image téléchargée avec succès');
-      },
-      onError: () => {
-        toast.error('Erreur lors du téléchargement de l\'image');
-      }
+  const uploadImageMutation = useMutation({
+    mutationFn: ({ id, file }) => productService.uploadImage(id, file),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['products']);
+      toast.success('Image téléchargée avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors du téléchargement de l\'image');
     }
-  );
+  });
 
   // Handle filters
   const handleFilterChange = (name, value) => {
@@ -343,21 +344,11 @@ const ProductsManagement = () => {
     return { text: 'In stock', color: 'success' };
   };
 
-  // Filter products
-  const filteredProducts = Array.isArray(data.products) 
-    ? data.products.filter(product => {
-        const { seasonalOnly, promotionsOnly } = filters;
-        
-        if (seasonalOnly && !product.isSeasonal) return false;
-        if (promotionsOnly && !product.hasPromotion) return false;
-        
-        return true;
-      })
-    : [];
+// Déjà corrigé dans le bloc précédent
 
   // Render content
   const renderContent = () => {
-    if (data.loading && filteredProducts.length === 0) {
+    if (isLoading && filteredProducts.length === 0) {
       return (
         <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
           <CircularProgress size={60} />
@@ -365,14 +356,14 @@ const ProductsManagement = () => {
       );
     }
 
-    if (data.error) {
+    if (error) {
       return (
         <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', textAlign: 'center' }}>
           <Typography variant="h6" color="error" gutterBottom>
             Loading error
           </Typography>
           <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
-            {data.error}
+            {error.message || 'An error occurred while loading products'}
           </Typography>
           <Button variant="outlined" onClick={() => window.location.reload()}>
             Retry
@@ -391,7 +382,7 @@ const ProductsManagement = () => {
             variant="outlined"
             startIcon={<AddIcon />}
             onClick={() => handleOpenDialog()}
-            disabled={data.loading}
+            disabled={isLoading}
           >
             Add product
           </Button>
@@ -504,9 +495,17 @@ const ProductsManagement = () => {
     );
   };
 
-  if (isLoading) {
-    return <Typography>Chargement...</Typography>;
-  }
+  // Filtrer les produits avec les données de useQuery
+  const filteredProducts = Array.isArray(products) 
+    ? products.filter(product => {
+        const { seasonalOnly, promotionsOnly } = filters;
+        
+        if (seasonalOnly && !product.isSeasonal) return false;
+        if (promotionsOnly && !product.hasPromotion) return false;
+        
+        return true;
+      })
+    : [];
 
   return (
     <Box sx={{ p: 3 }}>
@@ -565,7 +564,7 @@ const ProductsManagement = () => {
           {selectedProduct ? 'Edit' : 'Add'} product
         </DialogTitle>
         <DialogContent dividers>
-          {data.loading ? (
+          {isLoading ? (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
               <CircularProgress />
             </Box>
@@ -826,8 +825,8 @@ const ProductsManagement = () => {
           <Button onClick={handleCloseDialog} color="inherit">
             Cancel
           </Button>
-          <Button type="submit" variant="contained" disabled={data.loading}>
-            {data.loading ? <CircularProgress size={24} color="inherit" /> : selectedProduct ? 'Update' : 'Add'}
+          <Button type="submit" variant="contained" disabled={isLoading}>
+            {isLoading ? <CircularProgress size={24} color="inherit" /> : selectedProduct ? 'Update' : 'Add'}
           </Button>
         </DialogActions>
       </Dialog>

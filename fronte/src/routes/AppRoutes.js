@@ -81,47 +81,44 @@ const AppRoutes = () => {
                 <Route path="/boutique" element={<ProtectedRoute><Shop /></ProtectedRoute>} />
             </Route>
 
-            {/* Admin routes */}
-            <Route path="/administration" element={<ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>}>
-                <Route index element={<Dashboard />} />
-                <Route path="commandes" element={<OrdersManagement />} />
-                <Route path="produits" element={<ProductsManagement />} />
-                <Route path="paiements" element={<PaymentManagement />} />
-                <Route path="fournisseurs" element={<Suppliers />} />
-                <Route path="clients" element={<Customers />} />
-                <Route path="employes" element={<Employees />} />
-                <Route path="livraisons" element={<DeliveryManagement />} />
-                <Route path="ventes" element={<SalesManagement />} />
-                <Route path="parametres" element={<Settings />} />
-                <Route path="fidelite" element={<Loyalty />} />
-                <Route path="rapports" element={<Reports />} />
+            {/* Admin routes - VERSION AVEC role AU SINGULIER */}
+            <Route element={<ProtectedRoute role="admin"><AdminLayout /></ProtectedRoute>}>
+                <Route path="/administration" element={<Dashboard />} />
+                <Route path="/administration/commandes" element={<OrdersManagement />} />
+                <Route path="/administration/produits" element={<ProductsManagement />} />
+                <Route path="/administration/paiements" element={<PaymentManagement />} />
+                <Route path="/administration/fournisseurs" element={<Suppliers />} />
+                <Route path="/administration/clients" element={<Customers />} />
+                <Route path="/administration/employes" element={<Employees />} />
+                <Route path="/administration/livraisons" element={<DeliveryManagement />} />
+                <Route path="/administration/ventes" element={<SalesManagement />} />
+                <Route path="/administration/parametres" element={<Settings />} />
+                <Route path="/administration/fidelite" element={<Loyalty />} />
+                <Route path="/administration/rapports" element={<Reports />} />
             </Route>
 
             {/* Cashier routes */}
-            <Route path="/caisse" element={<ProtectedRoute role="cashier"><CashierLayout /></ProtectedRoute>}>
-                <Route index element={<div>Caisse principale</div>} />
-                <Route path="recus" element={<div>Gestion des reçus</div>} />
-                <Route path="historique" element={<div>Historique des transactions</div>} />
+            <Route element={<ProtectedRoute role="cashier"><CashierLayout /></ProtectedRoute>}>
+                <Route path="/caisse" element={<div>Caisse principale</div>} />
+                <Route path="/caisse/recus" element={<div>Gestion des reçus</div>} />
+                <Route path="/caisse/historique" element={<div>Historique des transactions</div>} />
             </Route>
 
             {/* Stockist routes */}
-            <Route path="/inventaire" element={<ProtectedRoute role="stockist"><StockistLayout /></ProtectedRoute>}>
-                <Route index element={<StockManagement />} />
-                <Route path="rapports" element={<InventoryReport />} />
-                <Route path="mouvements" element={<StockMovement />} />
+            <Route element={<ProtectedRoute role="stockist"><StockistLayout /></ProtectedRoute>}>
+                <Route path="/inventaire" element={<StockManagement />} />
+                <Route path="/inventaire/rapports" element={<InventoryReport />} />
+                <Route path="/inventaire/mouvements" element={<StockMovement />} />
             </Route>
 
             {/* Manager routes */}
-            <Route path="/finances" element={<ProtectedRoute role="manager"><ManagerLayout /></ProtectedRoute>}>
-                <Route path="ventes" element={<Sales />} />
-                <Route path="depenses" element={<Expenses />} />
-                <Route path="rapports" element={<FinancialReports />} />
-            </Route>
-
-            <Route path="/offres" element={<ProtectedRoute role="manager"><ManagerLayout /></ProtectedRoute>}>
-                <Route path="promotions" element={<Promotions />} />
-                <Route path="reductions" element={<Discounts />} />
-                <Route path="saisonnieres" element={<SeasonalOffers />} />
+            <Route element={<ProtectedRoute role="manager"><ManagerLayout /></ProtectedRoute>}>
+                <Route path="/finances/ventes" element={<Sales />} />
+                <Route path="/finances/depenses" element={<Expenses />} />
+                <Route path="/finances/rapports" element={<FinancialReports />} />
+                <Route path="/offres/promotions" element={<Promotions />} />
+                <Route path="/offres/reductions" element={<Discounts />} />
+                <Route path="/offres/saisonnieres" element={<SeasonalOffers />} />
             </Route>
 
             {/* 404 fallback */}

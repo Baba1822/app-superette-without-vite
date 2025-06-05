@@ -79,12 +79,45 @@ const Login = () => {
       });
       
       if (result?.success) {
-        const from = location.state?.from?.pathname || '/';
-        navigate(from, { replace: true });
+        // Utilisation de la redirection basée sur le rôle
+        const from = location.state?.from?.pathname;
+        const redirectPath = result.redirectPath;
+        
+        // Si l'utilisateur avait une destination spécifique avant la connexion, on la respecte
+        // Sinon, on utilise la redirection basée sur le rôle
+        const finalPath = from && from !== '/login' && from !== '/register' && from !== '/connexion' 
+          ? from 
+          : redirectPath;
+        
+        // Message personnalisé selon le rôle
+        let roleMessage = 'Connexion réussie !';
+        switch (result.user.role) {
+          case 'admin':
+            roleMessage = 'Bienvenue dans le tableau de bord administrateur !';
+            break;
+          case 'client':
+            roleMessage = 'Bienvenue dans notre boutique !';
+            break;
+          case 'cashier':
+            roleMessage = 'Bienvenue dans l\'interface caisse !';
+            break;
+          case 'stockist':
+            roleMessage = 'Bienvenue dans l\'interface inventaire !';
+            break;
+          case 'manager':
+            roleMessage = 'Bienvenue dans l\'interface de gestion !';
+            break;
+          default:
+            roleMessage = 'Bienvenue !';
+        }
+        
+        toast.success(roleMessage);
+        navigate(finalPath, { replace: true });
       } else {
         setError(result?.message || 'Email ou mot de passe incorrect');
       }
     } catch (error) {
+      console.error('Erreur lors de la connexion:', error);
       setError('Une erreur inattendue s\'est produite');
     } finally {
       setLoading(false);
@@ -158,7 +191,7 @@ const Login = () => {
                 )}
               </Button>
               <Box sx={{ display: 'flex', justifyContent: 'space-between', mt: 2 }}>
-                <Link component={RouterLink} to="/forgot-password" variant="body2">
+                <Link component={RouterLink} to="/mot-de-passe-oublie" variant="body2">
                   Mot de passe oublié ?
                 </Link>
                 <Link component={RouterLink} to="/register" variant="body2">

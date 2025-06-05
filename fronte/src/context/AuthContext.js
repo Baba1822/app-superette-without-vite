@@ -43,6 +43,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // Fonction pour déterminer la redirection basée sur le rôle
+  const getRedirectPath = (userRole, from = null) => {
+    // Si une redirection spécifique était prévue (from), on la respecte
+    if (from && from !== '/login' && from !== '/register' && from !== '/connexion') {
+      return from;
+    }
+
+    // Redirection basée sur le rôle selon vos routes définies
+    switch (userRole) {
+      case 'admin':
+        return '/administration'; // Route vers AdminLayout avec Dashboard par défaut
+      case 'client':
+        return '/boutique'; // Route vers Shop dans CustomerLayout
+      case 'cashier':
+        return '/caisse';
+      case 'stockist':
+        return '/inventaire';
+      case 'manager':
+        return '/finances';
+      default:
+        return '/';
+    }
+  };
+
   const login = async (credentials) => {
     try {
       if (!credentials.email || !credentials.motdepasse) {
@@ -67,7 +91,13 @@ export const AuthProvider = ({ children }) => {
         setUser(response.user);
         setError('');
         toast.success('Connexion réussie !');
-        return { success: true, user: response.user };
+        
+        // Retourner les informations de redirection basées sur le rôle
+        return { 
+          success: true, 
+          user: response.user,
+          redirectPath: getRedirectPath(response.user.role)
+        };
       } else {
         throw new Error(response.message || 'Échec de la connexion');
       }
@@ -112,7 +142,13 @@ export const AuthProvider = ({ children }) => {
         setUser(response.user);
         setError('');
         toast.success('Inscription réussie !');
-        return { success: true, user: response.user };
+        
+        // Retourner les informations de redirection basées sur le rôle
+        return { 
+          success: true, 
+          user: response.user,
+          redirectPath: getRedirectPath(response.user.role)
+        };
       } else {
         throw new Error(response.message || 'Échec de l\'inscription');
       }
@@ -215,7 +251,8 @@ export const AuthProvider = ({ children }) => {
       logout,
       apiRequest,
       refreshToken: refreshTokenFunc,
-      isAuthenticated: !!user
+      isAuthenticated: !!user,
+      getRedirectPath
     }}>
       {children}
     </AuthContext.Provider>
