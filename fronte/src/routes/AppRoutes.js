@@ -78,7 +78,7 @@ const AppRoutes = () => {
                 <Route path="/panier" element={<ProtectedRoute><Cart /></ProtectedRoute>} />
                 {/* Route Shop pour les clients connectés */}
                 <Route path="/Shop" element={<ProtectedRoute><Shop /></ProtectedRoute>} />
-                <Route path="/boutique" element={<ProtectedRoute><Shop /></ProtectedRoute>} />
+                
             </Route>
 
             {/* Admin routes - VERSION AVEC role AU SINGULIER */}

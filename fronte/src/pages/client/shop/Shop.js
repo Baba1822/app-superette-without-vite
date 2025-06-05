@@ -23,7 +23,13 @@ import {
   Tabs,
   Tab,
   Paper,
-  CircularProgress
+  CircularProgress,
+  Dialog,
+  DialogTitle,
+  DialogContent,
+  DialogActions,
+  Alert,
+  Snackbar
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -38,8 +44,10 @@ import {
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../context/CartContext';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productService } from '../../../services/productService';
+import { orderService } from '../../../services/orderService';
+import LoyaltyService from '../../../services/LoyaltyService';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
@@ -47,14 +55,52 @@ import 'slick-carousel/slick/slick-theme.css';
 const HomePage = () => {
   const navigate = useNavigate();
   const { cartItems = [], addToCart } = useCart();
+  const queryClient = useQueryClient();
+  const totalCartAmount = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
   const [searchTerm, setSearchTerm] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
-  const [loyaltyCard] = useState({
-    points: 1250,
-    level: 'Silver',
-    cardNumber: '1234 5678 9012'
+  const [loyaltyCard, setLoyaltyCard] = useState(null);
+  const [loyaltyCardLoading, setLoyaltyCardLoading] = useState(true);
+  const [pointsToRedeem, setPointsToRedeem] = useState(0);
+  const [showRedeemDialog, setShowRedeemDialog] = useState(false);
+  const [notification, setNotification] = useState({
+    open: false,
+    message: '',
+    severity: 'info'
   });
+  const [deliveryAddress, setDeliveryAddress] = useState('');
+  const [deliveryDistance, setDeliveryDistance] = useState(0);
+  const [deliveryFee, setDeliveryFee] = useState(0);
+  const [paymentMethod, setPaymentMethod] = useState('orange_money');
+  const [orderTotal, setOrderTotal] = useState(0);
+
+  // Afficher une notification
+  const showNotification = (message, severity = 'info') => {
+    setNotification({
+      open: true,
+      message,
+      severity
+    });
+  };
+
+  // Charger la carte de fidélité au chargement
+  useEffect(() => {
+    const loadLoyaltyCard = async () => {
+      try {
+        // Pour le moment, on utilise un ID client fixe pour le test
+        const customerId = 1; // À remplacer par la vraie authentification
+        const card = await LoyaltyService.getLoyaltyCard(customerId);
+        setLoyaltyCard(card);
+      } catch (error) {
+        console.error('Erreur lors du chargement de la carte de fidélité:', error);
+      } finally {
+        setLoyaltyCardLoading(false);
+      }
+    };
+    loadLoyaltyCard();
+  }, []);
+
 
   // Utilisation de React Query pour récupérer les produits
   const { data: products = [], isLoading } = useQuery({
@@ -62,11 +108,26 @@ const HomePage = () => {
     queryFn: productService.getAllProducts,
     retry: 2,
     staleTime: 1000 * 60 * 5, // 5 minutes
-    refetchOnWindowFocus: false,
+    refetchOnWindowFocus: true,
     onError: (error) => {
       console.error('Erreur lors de la récupération des produits:', error);
+      showNotification('Erreur lors de la récupération des produits', 'error');
     }
   });
+
+  // Effacer le cache des produits quand un nouveau produit est ajouté
+  const invalidateProductsCache = () => {
+    queryClient.invalidateQueries(['products']);
+  };
+
+  // Vérifier les mises à jour des produits toutes les 30 secondes
+  useEffect(() => {
+    const interval = setInterval(() => {
+      queryClient.refetchQueries(['products']);
+    }, 30000); // 30 secondes
+
+    return () => clearInterval(interval);
+  }, [queryClient]);
 
   // Mock des promotions (à remplacer par une API réelle)
   const promotions = [
@@ -104,8 +165,99 @@ const HomePage = () => {
     alert('Option de paiement fractionné');
   };
 
-  const handleLoyaltyCardScan = () => {
-    alert('Scanner la carte de fidélité');
+  // Scanner la carte de fidélité
+  const handleLoyaltyCardScan = async () => {
+    try {
+      // Simuler le scan d'une carte
+      const scannedCard = await LoyaltyService.getLoyaltyCard(1); // À remplacer par le vrai scan
+      if (scannedCard) {
+        setLoyaltyCard(scannedCard);
+        setShowRedeemDialog(true);
+      }
+    } catch (error) {
+      console.error('Erreur lors du scan de la carte:', error);
+      showNotification('Erreur lors du scan de la carte', 'error');
+    }
+  };
+
+  // Réduire les points
+  const handleRedeemPoints = async () => {
+    try {
+      if (!loyaltyCard || pointsToRedeem <= 0) return;
+
+      // Vérifier si on a assez de points
+      if (pointsToRedeem > loyaltyCard.points) {
+        showNotification('Points insuffisants', 'error');
+        return;
+      }
+
+      // Appel API pour réduire les points
+      await LoyaltyService.redeemPoints(loyaltyCard.id, pointsToRedeem);
+      
+      // Mettre à jour la carte localement
+      setLoyaltyCard({
+        ...loyaltyCard,
+        points: loyaltyCard.points - pointsToRedeem
+      });
+      
+      // Afficher une notification de succès
+      showNotification(`Points réduits avec succès. Nouveau total: ${loyaltyCard.points - pointsToRedeem} points`, 'success');
+      
+      setShowRedeemDialog(false);
+      setPointsToRedeem(0);
+    } catch (error) {
+      console.error('Erreur lors de la réduction des points:', error);
+      showNotification('Erreur lors de la réduction des points', 'error');
+    }
+  };
+
+  // Mutation pour créer une commande
+  const createOrderMutation = useMutation({
+    mutationFn: (orderData) => orderService.createOrder(orderData),
+    onSuccess: (data) => {
+      showNotification('Commande créée avec succès', 'success');
+      // Vider le panier après la commande
+      addToCart([]);
+      // Réinitialiser les champs
+      setDeliveryAddress('');
+      setDeliveryDistance(0);
+      setDeliveryFee(0);
+      setPaymentMethod('orange_money');
+    },
+    onError: (error) => {
+      showNotification('Erreur lors de la création de la commande', 'error');
+      console.error('Erreur commande:', error);
+    }
+  });
+
+  const handleCheckout = () => {
+    if (!deliveryAddress) {
+      showNotification('Veuillez entrer une adresse de livraison', 'error');
+      return;
+    }
+
+    if (deliveryDistance <= 0) {
+      showNotification('Veuillez entrer une distance valide', 'error');
+      return;
+    }
+
+    if (!paymentMethod) {
+      showNotification('Veuillez choisir une méthode de paiement', 'error');
+      return;
+    }
+
+    const orderData = {
+      clientId: 1, // À remplacer par l'ID du client connecté
+      deliveryAddress,
+      deliveryDistance,
+      paymentMethod,
+      items: cartItems.map(item => ({
+        productId: item.product.id,
+        quantity: item.quantity
+      }))
+    };
+
+    createOrderMutation.mutate(orderData);
   };
 
   // Filtrage des produits en fonction de la recherche et de la catégorie active
@@ -118,11 +270,24 @@ const HomePage = () => {
       (activeTab === 2 && product.category === 'Boissons') ||
       (activeTab === 3 && product.category === 'Produits Frais');
     
-    return matchesSearch && matchesCategory;
+    // Gérer les produits saisonniers et promotions
+    const isSeasonal = product.isSeasonal && 
+      new Date(product.seasonStart) <= new Date() &&
+      new Date(product.seasonEnd) >= new Date();
+    
+    const isOnPromotion = product.hasPromotion && 
+      new Date(product.promotionStart) <= new Date() &&
+      new Date(product.promotionEnd) >= new Date();
+    
+    return matchesSearch && matchesCategory && (!product.isSeasonal || isSeasonal) && (!product.hasPromotion || isOnPromotion);
   });
 
   // Calcul sécurisé du total
-  const totalCartAmount = cartItems?.reduce((sum, item) => sum + ((item?.price || 0) * (item?.quantity || 0)), 0) || 0;
+  const calculateTotal = () => {
+    const subtotal = cartItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
+    setOrderTotal(subtotal + deliveryFee);
+    return subtotal + deliveryFee;
+  };
 
   if (isLoading) {
     return <CircularProgress />;
@@ -206,32 +371,159 @@ const HomePage = () => {
               </Button>
             </Grid>
           </Grid>
-        </Paper>
 
-        {/* Loyalty Card Section */}
-        <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
-          <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Box>
-              <Typography variant="h6" gutterBottom>
-                Carte de Fidélité
-              </Typography>
-              <Typography variant="body1">
-                Niveau: <Chip label={loyaltyCard.level} color="primary" size="small" />
-              </Typography>
-              <Typography variant="body1">
-                Points: <Chip label={loyaltyCard.points} avatar={<Avatar>{loyaltyCard.points > 1000 ? '★' : '☆'}</Avatar>} />
-              </Typography>
-            </Box>
+          {/* Section Carte de Fidélité */}
+          <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
+            <Typography variant="h6" gutterBottom>
+              Carte de Fidélité
+            </Typography>
             
-            <Button
-              variant="outlined"
-              startIcon={<LoyaltyIcon />}
-              onClick={handleLoyaltyCardScan}
+            {loyaltyCardLoading ? (
+              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
+                <CircularProgress />
+              </Box>
+            ) : loyaltyCard ? (
+              <Box>
+                <Grid container spacing={2}>
+                  <Grid item xs={12} md={6}>
+                    <Card>
+                      <CardContent>
+                        <Typography variant="h6" gutterBottom>
+                          {loyaltyCard.cardNumber}
+                        </Typography>
+                        <Typography color="textSecondary">
+                          Niveau: {loyaltyCard.tier}
+                        </Typography>
+                        <Typography variant="h5" sx={{ mt: 1 }}>
+                          {loyaltyCard.points} points
+                        </Typography>
+                        <Button
+                          fullWidth
+                          variant="contained"
+                          startIcon={<QrIcon />}
+                          onClick={handleLoyaltyCardScan}
+                          sx={{ mt: 2 }}
+                        >
+                          Scanner la carte
+                        </Button>
+                      </CardContent>
+                    </Card>
+                  </Grid>
+                  <Grid item xs={12} md={6}>
+                    <Typography variant="subtitle1" gutterBottom>
+                      Avantages:
+                    </Typography>
+                    <List>
+                      {loyaltyCard.tier === 'Bronze' && (
+                        <ListItem>
+                          <ListItemText>
+                            1 point pour chaque 100 GNF dépensés
+                          </ListItemText>
+                        </ListItem>
+                      )}
+                      {loyaltyCard.tier === 'Silver' && (
+                        <ListItem>
+                          <ListItemText>
+                            1.5 points pour chaque 100 GNF dépensés
+                          </ListItemText>
+                        </ListItem>
+                      )}
+                      {loyaltyCard.tier === 'Gold' && (
+                        <ListItem>
+                          <ListItemText>
+                            2 points pour chaque 100 GNF dépensés
+                          </ListItemText>
+                        </ListItem>
+                      )}
+                    </List>
+                    <Box sx={{ mt: 2 }}>
+                      <Button
+                        fullWidth
+                        variant="contained"
+                        color="primary"
+                        onClick={() => setShowRedeemDialog(true)}
+                      >
+                        Réduire des points
+                      </Button>
+                    </Box>
+                  </Grid>
+                </Grid>
+              </Box>
+            ) : (
+              <Box sx={{ textAlign: 'center', py: 3 }}>
+                <Typography variant="body1">
+                  Vous n'avez pas encore de carte de fidélité
+                </Typography>
+                <Button
+                  variant="contained"
+                  color="primary"
+                  onClick={() => navigate('/loyalty')}
+                  sx={{ mt: 2 }}
+                >
+                  Créer une carte
+                </Button>
+              </Box>
+            )}
+          </Box>
+
+          {/* Dialogue de réduction des points */}
+          <Dialog open={showRedeemDialog} onClose={() => setShowRedeemDialog(false)}>
+            <DialogTitle>Réduire des points</DialogTitle>
+            <DialogContent>
+              <Box sx={{ mt: 2 }}>
+                <TextField
+                  fullWidth
+                  label="Points à réduire"
+                  type="number"
+                  value={pointsToRedeem}
+                  onChange={(e) => setPointsToRedeem(parseInt(e.target.value) || 0)}
+                  InputProps={{
+                    endAdornment: <Typography>/{loyaltyCard?.points || 0}</Typography>
+                  }}
+                />
+              </Box>
+            </DialogContent>
+            <DialogActions>
+              <Button onClick={() => setShowRedeemDialog(false)}>Annuler</Button>
+              <Button onClick={handleRedeemPoints} variant="contained" color="primary">
+                Réduire
+              </Button>
+            </DialogActions>
+          </Dialog>
+
+          {/* Notification */}
+          <Snackbar
+            open={notification.open}
+            autoHideDuration={6000}
+            onClose={() => setNotification({ ...notification, open: false })}
+          >
+            <Alert
+              onClose={() => setNotification({ ...notification, open: false })}
+              severity={notification.severity}
+              sx={{ width: '100%' }}
             >
-              Scanner ma carte
+              {notification.message}
+            </Alert>
+          </Snackbar>
+
+          {/* Section Paiement */}
+          <Box sx={{ mt: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Total à payer: {totalCartAmount} GNF
+            </Typography>
+            <Button
+              fullWidth
+              variant="contained"
+              color="primary"
+              onClick={() => navigate('/checkout')}
+              sx={{ mt: 2 }}
+            >
+              Passer à la caisse
             </Button>
           </Box>
         </Paper>
+
+
 
         {/* Promotions Slider */}
         <Box sx={{ mb: 3 }}>

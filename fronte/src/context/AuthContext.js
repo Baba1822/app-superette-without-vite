@@ -55,7 +55,7 @@ export const AuthProvider = ({ children }) => {
       case 'admin':
         return '/administration'; // Route vers AdminLayout avec Dashboard par défaut
       case 'client':
-        return '/boutique'; // Route vers Shop dans CustomerLayout
+        return '/Shop'; // Route vers Shop dans CustomerLayout
       case 'cashier':
         return '/caisse';
       case 'stockist':
