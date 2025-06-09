@@ -6,5 +6,6 @@ const { register, login, getCurrentUser } = require('../controllers/authControll
 router.post('/register', register);
 router.post('/login', login);
 router.get('/me', getCurrentUser);
+router.post('/refresh', require('../controllers/authController').refreshToken);
 
 module.exports = router;

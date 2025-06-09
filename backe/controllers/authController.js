@@ -133,3 +133,45 @@ exports.getCurrentUser = async (req, res) => {
         res.status(500).json({ error: 'Erreur lors de la récupération des informations utilisateur' });
     }
 };
+
+exports.refreshToken = async (req, res) => {
+    try {
+        const { refreshToken } = req.body;
+        
+        if (!refreshToken) {
+            return res.status(400).json({ error: 'Refresh token requis' });
+        }
+
+        // Vérifier si le refresh token existe dans la base de données
+        const user = await User.findByRefreshToken(refreshToken);
+        if (!user) {
+            return res.status(401).json({ error: 'Refresh token invalide' });
+        }
+
+        // Générer un nouveau token
+        const token = jwt.sign(
+            { userId: user.id },
+            process.env.JWT_SECRET,
+            { expiresIn: '24h' }
+        );
+
+        // Générer un nouveau refresh token
+        const newRefreshToken = jwt.sign(
+            { userId: user.id },
+            process.env.JWT_REFRESH_SECRET,
+            { expiresIn: '7d' }
+        );
+
+        // Mettre à jour le refresh token dans la base de données
+        await User.updateRefreshToken(user.id, newRefreshToken);
+
+        res.json({
+            success: true,
+            token,
+            refreshToken: newRefreshToken
+        });
+    } catch (error) {
+        console.error('Erreur lors du rafraîchissement du token:', error);
+        res.status(500).json({ error: 'Erreur lors du rafraîchissement du token' });
+    }
+};
