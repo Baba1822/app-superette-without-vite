@@ -1,16 +1,23 @@
 const express = require('express');
 const router = express.Router();
-const pool = require('../config/db');
 const auth = require('../middleware/auth');
+const Product = require('../models/Product');
 
 // Récupérer tous les produits
 router.get('/', async (req, res) => {
     try {
-        const [products] = await pool.query(
-            'SELECT p.*, c.nom as categorie_nom FROM produits p LEFT JOIN categories c ON p.categorie_id = c.id'
-        );
+        const filters = {};
+        if (req.query.categoryId) {
+            filters.categoryId = parseInt(req.query.categoryId);
+        }
+        if (req.query.search) {
+            filters.search = req.query.search;
+        }
+        
+        const products = await Product.getAll(filters);
         res.json(products);
     } catch (error) {
+        console.error('Erreur dans la route GET /products:', error);
         res.status(500).json({ error: 'Erreur lors de la récupération des produits' });
     }
 });
@@ -18,15 +25,13 @@ router.get('/', async (req, res) => {
 // Récupérer un produit par ID
 router.get('/:id', async (req, res) => {
     try {
-        const [product] = await pool.query(
-            'SELECT p.*, c.nom as categorie_nom FROM produits p LEFT JOIN categories c ON p.categorie_id = c.id WHERE p.id = ?',
-            [req.params.id]
-        );
-        if (!product.length) {
+        const product = await Product.getById(req.params.id);
+        if (!product) {
             return res.status(404).json({ error: 'Produit non trouvé' });
         }
-        res.json(product[0]);
+        res.json(product);
     } catch (error) {
+        console.error('Erreur dans la route GET /products/:id:', error);
         res.status(500).json({ error: 'Erreur lors de la récupération du produit' });
     }
 });

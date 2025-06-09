@@ -13,23 +13,32 @@ try {
 // Middleware d'authentification optionnel pour le debug
 const auth = (req, res, next) => {
     console.log('Middleware auth - requête reçue:', req.path);
-    // Temporairement désactivé pour le debug
-    next();
-    
-    // Version avec authentification (à activer plus tard)
-    /*
     try {
-        const token = req.header('Authorization')?.replace('Bearer ', '');
-        if (!token) {
+        // Récupérer le token du header Authorization
+        const authHeader = req.header('Authorization');
+        if (!authHeader) {
             return res.status(401).json({ error: 'Token d\'accès requis' });
         }
-        // Vérification du token ici
+
+        // Extraire le token (doit être au format 'Bearer <token>')
+        const token = authHeader.replace('Bearer ', '');
+        if (!token) {
+            return res.status(401).json({ error: 'Format de token invalide' });
+        }
+
+        // Vérifier le format du token
+        if (!/^Bearer [A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/.test(authHeader)) {
+            return res.status(401).json({ error: 'Format de token invalide' });
+        }
+
+        // Pour l'instant, on désactive la vérification JWT pour le debug
+        // À implémenter : vérification du JWT avec la clé secrète
         next();
     } catch (error) {
-        res.status(401).json({ error: 'Token invalide' });
+        console.error('Erreur dans le middleware auth:', error);
+        res.status(401).json({ error: 'Erreur d\'authentification' });
     }
-    */
-};
+}
 
 // Route de test pour vérifier que les routes fonctionnent
 router.get('/test', (req, res) => {

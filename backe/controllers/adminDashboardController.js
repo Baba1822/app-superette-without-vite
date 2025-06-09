@@ -13,7 +13,27 @@ exports.getDashboardStats = async (req, res) => {
 
 exports.getTopProducts = async (req, res) => {
     try {
-        const limit = req.query.limit || 5;
+        // Assurer que le limit est un nombre valide
+        const limitParam = req.query.limit;
+        let limit = 5; // Valeur par défaut
+        
+        if (limitParam) {
+            // Vérifier si c'est un nombre
+            if (typeof limitParam === 'number') {
+                limit = limitParam;
+            } else if (typeof limitParam === 'string') {
+                const parsed = parseInt(limitParam);
+                if (!isNaN(parsed)) {
+                    limit = parsed;
+                }
+            }
+            
+            // Vérifier que le limit est valide
+            if (limit <= 0) {
+                return res.status(400).json({ error: 'Le paramètre limit doit être un nombre positif' });
+            }
+        }
+        
         const products = await AdminDashboard.getTopProducts(limit);
         res.json(products);
     } catch (error) {

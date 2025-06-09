@@ -2,25 +2,44 @@ const pool = require('../config/db');
 
 class Product {
     static async getAll(filters = {}) {
-        let query = 'SELECT p.*, c.nom as categorie_nom, c.description as categorie_description, c.image as categorie_image ' +
-                   'FROM produits p LEFT JOIN categories_produits c ON p.categorie_id = c.id';
-        const params = [];
+        try {
+            // Construire la requête avec des paramètres sécurisés
+            let query = `
+                SELECT 
+                    p.*, 
+                    c.nom as categorie_nom, 
+                    c.description as categorie_description 
+                FROM produits p 
+                LEFT JOIN categories_produits c ON p.categorie_id = c.id`;
+            const params = [];
+            let whereClause = '';
 
-        if (filters.categoryId) {
-            query += ' WHERE p.categorie_id = ?';
-            params.push(filters.categoryId);
+            // Ajouter les filtres
+            if (filters.categoryId) {
+                params.push(filters.categoryId);
+                whereClause += ` ${whereClause ? 'AND' : 'WHERE'} p.categorie_id = ?`;
+            }
+
+            if (filters.search) {
+                params.push(`%${filters.search}%`, `%${filters.search}%`);
+                whereClause += ` ${whereClause ? 'AND' : 'WHERE'} (p.nom LIKE ? OR p.description LIKE ?)`;
+            }
+
+            // Ajouter la clause WHERE si nécessaire
+            if (whereClause) {
+                query += whereClause;
+            }
+
+            // Ajouter l'ordre
+            query += ' ORDER BY p.nom ASC';
+
+            // Exécuter la requête
+            const [products] = await pool.query(query, params);
+            return products;
+        } catch (error) {
+            console.error('Erreur dans getAll:', error);
+            throw error;
         }
-
-        if (filters.search) {
-            query += params.length ? ' AND' : ' WHERE';
-            query += ' (p.nom LIKE ? OR p.description LIKE ?)';
-            params.push(`%${filters.search}%`, `%${filters.search}%`);
-        }
-
-        query += ' ORDER BY p.nom ASC';
-
-        const [products] = await pool.query(query, params);
-        return products;
     }
 
     static async getById(id) {

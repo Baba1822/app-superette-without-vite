@@ -127,20 +127,39 @@ const Login = () => {
       });
        
       if (result?.success) {
-        // CORRECTION: Récupérer la redirection depuis location.state ou utiliser celle fournie
-        const from = location.state?.from?.pathname;
-        const finalRedirectPath = from && from !== '/login' && from !== '/connexion' 
-          ? from 
-          : result.redirectPath;
+        // Déterminer le chemin de redirection en fonction du rôle
+        const userType = result.user.type;
 
-        console.log('Redirection vers:', finalRedirectPath);
+        switch (userType) {
+          case 'admin':
+            // Pour l'admin, nous devons d'abord accéder au layout
+            navigate('/administration', { replace: true });
+            break;
+          case 'client':
+            // Pour le client, Shop est déjà défini comme route
+            navigate('/Shop', { replace: true });
+            break;
+          case 'cashier':
+            // Pour le caissier, nous devons d'abord accéder au layout
+            navigate('/caisse', { replace: true });
+            break;
+          case 'stockist':
+            // Pour le gestionnaire d'inventaire
+            navigate('/inventaire', { replace: true });
+            break;
+          case 'manager':
+            // Pour le manager, nous devons d'abord accéder au layout
+            navigate('/finances', { replace: true });
+            break;
+        }
+
+        console.log('Redirection vers:', userType, 'vers son dashboard');
         
-        // Navigation avec replace pour éviter de revenir sur la page de login
-        navigate(finalRedirectPath, { replace: true });
+        // Message de succès basé sur le type
         
         // Message de succès basé sur le type d'utilisateur
         let roleMessage = 'Connexion réussie !';
-        switch (result.user.type) {
+        switch (userType) {
           case 'admin':
             roleMessage = 'Bienvenue dans le tableau de bord administrateur !';
             break;
@@ -154,12 +173,9 @@ const Login = () => {
             roleMessage = 'Bienvenue dans l\'interface inventaire !';
             break;
           case 'manager':
-            roleMessage = 'Bienvenue dans l\'interface de gestion !';
+            roleMessage = 'Bienvenue dans l\'interface finance !';
             break;
-          default:
-            roleMessage = 'Bienvenue !';
         }
-        
         toast.success(roleMessage);
       } else {
         setError(result?.message || 'Email ou mot de passe incorrect');

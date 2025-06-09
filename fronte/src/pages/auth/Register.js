@@ -96,9 +96,9 @@ function Register() {
         motdepasse: formData.motdepasse
       });
       if (result?.success) {
-        // Utiliser le chemin de redirection basé sur le rôle au lieu de naviguer vers '/'
-        const redirectUrl = result.redirectUrl || '/Shop'; // fallback vers /Shop pour les clients
-        navigate(redirectUrl, { replace: true });
+        // Utiliser le chemin de redirection fourni par le backend
+        const redirectPath = result.redirectPath;
+        navigate(redirectPath, { replace: true });
       }
     } catch (err) {
       console.error('Registration error:', err);

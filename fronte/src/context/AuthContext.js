@@ -41,11 +41,23 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  // Fonction pour vérifier la validité du token
+  const isTokenValid = () => {
+    const token = localStorage.getItem('token');
+    if (!token) return false;
+    try {
+      const decoded = jwtDecode(token);
+      return decoded.exp > Date.now() / 1000;
+    } catch (error) {
+      return false;
+    }
+  };
+
   // Vérification initiale du token
   useEffect(() => {
     const checkAuth = async () => {
       const token = localStorage.getItem('token');
-      if (token) {
+      if (token && isTokenValid()) {
         try {
           const decoded = jwtDecode(token);
           setUser({
@@ -68,32 +80,66 @@ export const AuthProvider = ({ children }) => {
 
   const apiRequest = async (endpoint, options = {}) => {
     try {
-      const token = localStorage.getItem('token');
+      // Utiliser l'endpoint complet avec le proxy
       const config = {
-        method: options.method || 'GET',
+        ...options,
         headers: {
           'Content-Type': 'application/json',
-          ...(token && { 'Authorization': `Bearer ${token}` }),
-          ...options.headers
-        },
-        ...options
+          ...(options.headers || {})
+        }
       };
 
       if (options.body) {
         config.body = JSON.stringify(options.body);
       }
 
-      const response = await fetch(`${API_BASE_URL}${endpoint}`, config);
-      
-      const responseData = await response.json().catch(() => ({}));
-      
-      if (!response.ok) {
-        throw new Error(responseData.message || `Erreur HTTP: ${response.status}`);
+      // Ajouter le préfixe /api si nécessaire
+      const fullEndpoint = endpoint.startsWith('/') ? endpoint : `/api${endpoint}`;
+
+      // Ajouter le token dans le header si disponible
+      const token = localStorage.getItem('token');
+      if (token) {
+        config.headers = {
+          ...config.headers,
+          'Authorization': `Bearer ${token}`
+        };
       }
 
+      // Utiliser le proxy configuré dans package.json
+      const response = await fetch(fullEndpoint, {
+        ...config,
+        credentials: 'include'
+      });
+
+      // Vérifier si la requête a réussi
+      if (!response.ok) {
+        try {
+          const errorData = await response.json();
+          throw new Error(
+            errorData.message || 
+            errorData.error || 
+            `Erreur HTTP ${response.status}: ${response.statusText}`
+          );
+        } catch (parseError) {
+          const text = await response.text();
+          throw new Error(`Erreur serveur: ${text}`);
+        }
+      }
+
+      const responseData = await response.json();
+      console.log('Réponse brute:', responseData);
       return responseData;
     } catch (error) {
-      console.error('API Error:', error);
+      if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+        throw new Error('Impossible de se connecter au serveur. Vérifiez que le serveur backend est en cours d\'exécution.');
+      }
+      
+      console.error('API Error Details:', {
+        message: error.message,
+        name: error.name,
+        stack: error.stack
+      });
+      
       throw error;
     }
   };
@@ -111,31 +157,47 @@ export const AuthProvider = ({ children }) => {
 
       setLoading(true);
       
-      const response = await apiRequest('/api/auth/login', {
-        method: 'POST',
-        body: loginData
-      });
+      try {
+        const response = await apiRequest('/api/auth/login', {
+          method: 'POST',
+          body: loginData
+        });
 
-      setLoading(false);
-
-      if (response.success && response.token) {
-        localStorage.setItem('token', response.token);
-        if (response.refreshToken) {
-          localStorage.setItem('refreshToken', response.refreshToken);
+        // Vérifier si c'est une réponse d'erreur du backend
+        if (response?.error) {
+          throw new Error(response.error);
         }
+
+        if (!response?.success || !response?.token) {
+          throw new Error('Échec de la connexion. Veuillez vérifier vos identifiants.');
+        }
+
+        // Connexion réussie
+        localStorage.setItem('token', response.token);
         setUser(response.user);
         setError('');
-        
-        // CORRECTION: Calculer le redirectPath ici si pas fourni par le serveur
-        const redirectPath = response.redirectPath || getRedirectPath(response.user.type);
-        
-        return { 
-          success: true, 
-          user: response.user,
-          redirectPath: redirectPath
+        toast.success('Connexion réussie !');
+        return {
+          success: true,
+          token: response.token,
+          user: response.user
         };
-      } else {
-        throw new Error(response.message || 'Échec de la connexion');
+      } catch (error) {
+        console.error('Erreur de connexion:', {
+          message: error.message,
+          stack: error.stack,
+          name: error.name,
+          status: error.status,
+          response: error.response
+        });
+        
+        // Afficher le message d'erreur détaillé
+        const errorMessage = error.response?.data?.message || 
+                           error.response?.data?.error || 
+                           error.message || 
+                           'Erreur de connexion au serveur';
+        toast.error(errorMessage);
+        throw error;
       }
     } catch (error) {
       console.error('Erreur login:', error);
@@ -144,6 +206,8 @@ export const AuthProvider = ({ children }) => {
       toast.error(errorMessage);
       setLoading(false);
       return { success: false, message: errorMessage };
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -171,9 +235,15 @@ export const AuthProvider = ({ children }) => {
         setError('');
         toast.success('Inscription réussie !');
 
-        // CORRECTION: Retourner les données pour permettre la navigation côté composant
-        // au lieu d'utiliser window.location.href
+        // Récupérer la redirection depuis le response ou utiliser le chemin par défaut
         const redirectPath = response.redirectUrl || getRedirectPath(response.user.type);
+        
+        return {
+          success: true,
+          token: response.token,
+          user: response.user,
+          redirectPath
+        };
 
         return { 
           success: true, 

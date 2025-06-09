@@ -3,14 +3,14 @@ const pool = require('../config/database'); // Utilisez le bon chemin selon votr
 class AdminDashboard {
     static async getDashboardStats() {
         try {
-            const [stats] = await pool.query(
+            const [result] = await pool.query(
                 `SELECT 
                     (SELECT COUNT(*) FROM commandes WHERE statut = 'terminee') as total_ventes,
                     (SELECT COALESCE(SUM(montant_total), 0) FROM commandes WHERE statut = 'terminee') as chiffre_affaires,
-                    (SELECT COUNT(*) FROM clients) as total_clients,
+                    (SELECT COUNT(*) FROM utilisateurs WHERE type = 'client') as total_clients,
                     (SELECT COUNT(*) FROM produits) as total_produits,
                     (SELECT COUNT(*) FROM fournisseurs) as total_fournisseurs,
-                    (SELECT COUNT(*) FROM employes) as total_employes,
+                    (SELECT COUNT(*) FROM utilisateurs WHERE type = 'employe') as total_employes,
                     (SELECT COUNT(*) FROM commandes WHERE DATE(date_creation) = CURDATE()) as ventes_jour,
                     (SELECT COALESCE(SUM(montant_total), 0) FROM commandes WHERE DATE(date_creation) = CURDATE()) as chiffre_jour,
                     (SELECT COUNT(*) FROM commandes WHERE statut = 'en_attente') as commandes_en_attente,
@@ -18,7 +18,7 @@ class AdminDashboard {
                     (SELECT COUNT(*) FROM mouvements_stock WHERE type_mouvement = 'entree' AND DATE(date_mouvement) = CURDATE()) as stocks_entrees,
                     (SELECT COUNT(*) FROM mouvements_stock WHERE type_mouvement = 'sortie' AND DATE(date_mouvement) = CURDATE()) as stocks_sorties
                 `);
-            return stats[0] || {};
+            return result[0] || {};
         } catch (error) {
             console.error('Erreur dans getDashboardStats:', error);
             throw error;
