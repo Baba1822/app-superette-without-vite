@@ -8,7 +8,7 @@ import { getRedirectPath } from '../context/AuthContext';
 const ProtectedRoute = ({
   children,
   roles = [],
-  redirectUnauthenticated = "/login", // Changé de "/connexion" à "/login"
+  redirectUnauthenticated = "/login",
   redirectUnauthorized = null
 }) => {
   const { isAuthenticated, user, loading } = useAuth();
@@ -57,8 +57,8 @@ const ProtectedRoute = ({
     );
   }
 
-  // CORRECTION: Utiliser Outlet au lieu de children pour les routes imbriquées
-  return children || <Outlet />;
+  // CORRECTION: Toujours utiliser Outlet pour les routes imbriquées
+  return children ? children : <Outlet />;
 };
 
 // Composant spécialisé pour les routes admin

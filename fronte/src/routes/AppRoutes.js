@@ -70,166 +70,65 @@ const AppRoutes = () => {
                 <Route path="/reinitialiser-mot-de-passe/:token" element={<ResetPassword />} />
             </Route>
 
-            {/* CORRECTION: Structure des routes protégées */}
-            {/* Customer routes */}
-            <Route path="/mon-profil" element={
-                <ProtectedRoute roles={['client']}>
-                    <CustomerLayout><Profile /></CustomerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/mes-commandes" element={
-                <ProtectedRoute roles={['client']}>
-                    <CustomerLayout><ClientOrders /></CustomerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/fidelite" element={
-                <ProtectedRoute roles={['client']}>
-                    <CustomerLayout><LoyaltyStatus /></CustomerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/panier" element={
-                <ProtectedRoute roles={['client']}>
-                    <CustomerLayout><Cart /></CustomerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/Shop" element={
-                <ProtectedRoute roles={['client']}>
-                    <CustomerLayout><Shop /></CustomerLayout>
-                </ProtectedRoute>
-            } />
+            {/* Customer routes - Structure corrigée */}
+            <Route element={<ProtectedRoute roles={['client']} />}>
+                <Route element={<CustomerLayout />}>
+                    <Route path="/mon-profil" element={<Profile />} />
+                    <Route path="/mes-commandes" element={<ClientOrders />} />
+                    <Route path="/fidelite" element={<LoyaltyStatus />} />
+                    <Route path="/panier" element={<Cart />} />
+                    <Route path="/Shop" element={<Shop />} />
+                </Route>
+            </Route>
 
-            {/* Admin routes */}
-            <Route path="/administration" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Dashboard /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/commandes" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><OrdersManagement /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/produits" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><ProductsManagement /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/paiements" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><PaymentManagement /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/fournisseurs" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Suppliers /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/clients" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Customers /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/employes" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Employees /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/livraisons" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><DeliveryManagement /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/ventes" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><SalesManagement /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/parametres" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Settings /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/fidelite" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Loyalty /></AdminLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/administration/rapports" element={
-                <ProtectedRoute roles={['admin']}>
-                    <AdminLayout><Reports /></AdminLayout>
-                </ProtectedRoute>
-            } />
+            {/* Admin routes - Structure corrigée */}
+            <Route element={<ProtectedRoute roles={['admin']} />}>
+                <Route element={<AdminLayout />}>
+                    <Route path="/administration" element={<Dashboard />} />
+                    <Route path="/administration/commandes" element={<OrdersManagement />} />
+                    <Route path="/administration/produits" element={<ProductsManagement />} />
+                    <Route path="/administration/paiements" element={<PaymentManagement />} />
+                    <Route path="/administration/fournisseurs" element={<Suppliers />} />
+                    <Route path="/administration/clients" element={<Customers />} />
+                    <Route path="/administration/employes" element={<Employees />} />
+                    <Route path="/administration/livraisons" element={<DeliveryManagement />} />
+                    <Route path="/administration/ventes" element={<SalesManagement />} />
+                    <Route path="/administration/parametres" element={<Settings />} />
+                    <Route path="/administration/fidelite" element={<Loyalty />} />
+                    <Route path="/administration/rapports" element={<Reports />} />
+                </Route>
+            </Route>
 
-            {/* Cashier routes */}
-            <Route path="/caisse" element={
-                <ProtectedRoute roles={['cashier']}>
-                    <CashierLayout><div>Caisse principale</div></CashierLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/caisse/recus" element={
-                <ProtectedRoute roles={['cashier']}>
-                    <CashierLayout><div>Gestion des reçus</div></CashierLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/caisse/historique" element={
-                <ProtectedRoute roles={['cashier']}>
-                    <CashierLayout><div>Historique des transactions</div></CashierLayout>
-                </ProtectedRoute>
-            } />
+            {/* Cashier routes - Structure corrigée */}
+            <Route element={<ProtectedRoute roles={['cashier']} />}>
+                <Route element={<CashierLayout />}>
+                    <Route path="/caisse" element={<div>Caisse principale</div>} />
+                    <Route path="/caisse/recus" element={<div>Gestion des reçus</div>} />
+                    <Route path="/caisse/historique" element={<div>Historique des transactions</div>} />
+                </Route>
+            </Route>
 
-            {/* Stockist routes */}
-            <Route path="/inventaire" element={
-                <ProtectedRoute roles={['stockist']}>
-                    <StockistLayout><StockManagement /></StockistLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/inventaire/rapports" element={
-                <ProtectedRoute roles={['stockist']}>
-                    <StockistLayout><InventoryReport /></StockistLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/inventaire/mouvements" element={
-                <ProtectedRoute roles={['stockist']}>
-                    <StockistLayout><StockMovement /></StockistLayout>
-                </ProtectedRoute>
-            } />
+            {/* Stockist routes - Structure corrigée */}
+            <Route element={<ProtectedRoute roles={['stockist']} />}>
+                <Route element={<StockistLayout />}>
+                    <Route path="/inventaire" element={<StockManagement />} />
+                    <Route path="/inventaire/rapports" element={<InventoryReport />} />
+                    <Route path="/inventaire/mouvements" element={<StockMovement />} />
+                </Route>
+            </Route>
 
-            {/* Manager routes - CORRECTION: Chemins manquants */}
-            <Route path="/finances" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><Sales /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/finances/ventes" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><Sales /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/finances/depenses" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><Expenses /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/finances/rapports" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><FinancialReports /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/offres/promotions" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><Promotions /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/offres/reductions" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><Discounts /></ManagerLayout>
-                </ProtectedRoute>
-            } />
-            <Route path="/offres/saisonnieres" element={
-                <ProtectedRoute roles={['manager']}>
-                    <ManagerLayout><SeasonalOffers /></ManagerLayout>
-                </ProtectedRoute>
-            } />
+            {/* Manager routes - Structure corrigée */}
+            <Route element={<ProtectedRoute roles={['manager']} />}>
+                <Route element={<ManagerLayout />}>
+                    <Route path="/finances" element={<Sales />} />
+                    <Route path="/finances/ventes" element={<Sales />} />
+                    <Route path="/finances/depenses" element={<Expenses />} />
+                    <Route path="/finances/rapports" element={<FinancialReports />} />
+                    <Route path="/offres/promotions" element={<Promotions />} />
+                    <Route path="/offres/reductions" element={<Discounts />} />
+                    <Route path="/offres/saisonnieres" element={<SeasonalOffers />} />
+                </Route>
+            </Route>
 
             {/* 404 fallback */}
             <Route path="*" element={<NotFound />} />
