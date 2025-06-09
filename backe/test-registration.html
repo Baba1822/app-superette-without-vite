@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Test Registration</title>
+    <script src="https://unpkg.com/axios/dist/axios.min.js"></script>
+</head>
+<body>
+    <div id="result"></div>
+    <script>
+        const register = async () => {
+            try {
+                const response = await axios.post('http://localhost:5000/api/auth/register', {
+                    prenom: 'Baba',
+                    nom: 'Keita',
+                    email: 'test.inscription3@gmail.com',
+                    telephone: '625647560',
+                    motdepasse: 'Aly123'
+                });
+
+                document.getElementById('result').innerHTML = 'Réponse: ' + JSON.stringify(response.data, null, 2);
+                
+                // Redirection vers Shop si spécifié
+                if (response.data.redirectUrl) {
+                    window.location.href = response.data.redirectUrl;
+                }
+            } catch (error) {
+                document.getElementById('result').innerHTML = 'Erreur: ' + error.message;
+            }
+        };
+
+        // Exécuter le test
+        register();
+    </script>
+</body>
+</html>

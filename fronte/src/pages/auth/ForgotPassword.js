@@ -8,19 +8,33 @@ import {
   Typography,
   Link,
   CircularProgress,
+  Alert,
+  IconButton,
+  Stack,
 } from '@mui/material';
 import { Link as RouterLink } from 'react-router-dom';
 import { toast } from 'react-toastify';
 import api from '../../config/api.config';
 import { Storefront as StorefrontIcon } from '@mui/icons-material';
+import { ArrowBack as ArrowBackIcon } from '@mui/icons-material';
 
 const ForgotPassword = () => {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [error, setError] = useState('');
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    if (!email) {
+      setError('Veuillez entrer une adresse email');
+      return;
+    }
+    if (!email.includes('@')) {
+      setError('Veuillez entrer une adresse email valide');
+      return;
+    }
+    setError('');
     setLoading(true);
 
     try {
@@ -36,7 +50,7 @@ const ForgotPassword = () => {
 
   if (sent) {
     return (
-      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+      <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
         <Container component="main" maxWidth="xs">
           <Box
             sx={{
@@ -44,32 +58,54 @@ const ForgotPassword = () => {
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
+              minHeight: '100vh',
+              justifyContent: 'center',
             }}
           >
             <Paper
               elevation={3}
               sx={{
-                padding: 4,
+                padding: 6,
                 display: 'flex',
                 flexDirection: 'column',
                 alignItems: 'center',
                 width: '100%',
+                bgcolor: 'white',
+                borderRadius: 2,
               }}
             >
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                <StorefrontIcon sx={{ mr: 1, fontSize: '2rem' }} />
-                <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }} gutterBottom>
-                  App Superette - Email envoyé !
+              <IconButton
+                component={RouterLink}
+                to="/login"
+                sx={{ position: 'absolute', top: 16, left: 16 }}
+              >
+                <ArrowBackIcon />
+              </IconButton>
+
+              <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+                <StorefrontIcon sx={{ mr: 1, fontSize: '2.5rem', color: '#1976d2' }} />
+                <Typography component="h1" variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }} gutterBottom>
+                  App Superette
                 </Typography>
               </Box>
-              <Typography variant="body1" align="center" sx={{ mt: 2 }}>
-                Un email contenant les instructions de réinitialisation de mot de passe a été envoyé à {email}.
+
+              <Typography variant="h6" component="h2" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+                Email envoyé !
               </Typography>
+              
+              <Typography variant="body1" align="center" sx={{ mb: 4, color: 'text.secondary' }}>
+                Un email contenant les instructions de réinitialisation de mot de passe a été envoyé à {email}.
+                <br />
+                Vérifiez votre boîte de réception et suivez les instructions pour créer un nouveau mot de passe.
+              </Typography>
+
               <Button
                 component={RouterLink}
                 to="/login"
                 variant="contained"
-                sx={{ mt: 3 }}
+                color="primary"
+                size="large"
+                sx={{ mt: 3, px: 4 }}
               >
                 Retour à la connexion
               </Button>
@@ -81,7 +117,7 @@ const ForgotPassword = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: '#f5f5f5' }}>
       <Container component="main" maxWidth="xs">
         <Box
           sx={{
@@ -89,27 +125,51 @@ const ForgotPassword = () => {
             display: 'flex',
             flexDirection: 'column',
             alignItems: 'center',
+            minHeight: '100vh',
+            justifyContent: 'center',
           }}
         >
           <Paper
             elevation={3}
             sx={{
-              padding: 4,
+              padding: 6,
               display: 'flex',
               flexDirection: 'column',
               alignItems: 'center',
               width: '100%',
+              bgcolor: 'white',
+              borderRadius: 2,
             }}
           >
-            <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-              <StorefrontIcon sx={{ mr: 1, fontSize: '2rem' }} />
-              <Typography component="h1" variant="h5" sx={{ fontWeight: 'bold' }}>
-                App Superette - Mot de passe oublié
+            <IconButton
+              component={RouterLink}
+              to="/login"
+              sx={{ position: 'absolute', top: 16, left: 16 }}
+            >
+              <ArrowBackIcon />
+            </IconButton>
+
+            <Box sx={{ display: 'flex', alignItems: 'center', mb: 4 }}>
+              <StorefrontIcon sx={{ mr: 1, fontSize: '2.5rem', color: '#1976d2' }} />
+              <Typography component="h1" variant="h4" sx={{ fontWeight: 'bold', color: '#1976d2' }} gutterBottom>
+                App Superette
               </Typography>
             </Box>
-            <Typography variant="body2" sx={{ mt: 2, mb: 3, textAlign: 'center' }}>
+
+            <Typography variant="h6" component="h2" sx={{ mb: 2, fontWeight: 'bold', color: '#1976d2' }}>
+              Mot de passe oublié
+            </Typography>
+            
+            <Typography variant="body1" align="center" sx={{ mb: 4, color: 'text.secondary' }}>
               Entrez votre adresse email pour recevoir un lien de réinitialisation de mot de passe.
             </Typography>
+
+            {error && (
+              <Alert severity="error" sx={{ mb: 2, width: '100%' }}>
+                {error}
+              </Alert>
+            )}
+
             <Box component="form" onSubmit={handleSubmit} sx={{ mt: 1, width: '100%' }}>
               <TextField
                 margin="normal"
@@ -122,7 +182,10 @@ const ForgotPassword = () => {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
+                error={!!error}
+                helperText={error}
               />
+
               <Button
                 type="submit"
                 fullWidth
@@ -130,13 +193,14 @@ const ForgotPassword = () => {
                 sx={{ mt: 3, mb: 2 }}
                 disabled={loading}
               >
-                {loading ? <CircularProgress size={24} /> : 'Envoyer le lien'}
+                {loading ? <CircularProgress size={24} /> : 'Envoyer'}
               </Button>
-              <Box sx={{ textAlign: 'center' }}>
+
+              <Stack direction="row" justifyContent="center" spacing={2}>
                 <Link component={RouterLink} to="/login" variant="body2">
                   Retour à la connexion
                 </Link>
-              </Box>
+              </Stack>
             </Box>
           </Paper>
         </Box>

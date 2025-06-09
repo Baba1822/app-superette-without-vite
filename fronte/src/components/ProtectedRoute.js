@@ -1,25 +1,27 @@
 import React from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { CircularProgress, Box, Typography } from '@mui/material';
+import { getRedirectPath } from '../context/AuthContext';
 
+// Composant principal ProtectedRoute
 const ProtectedRoute = ({
   children,
   roles = [],
-  redirectUnauthenticated = "/connexion",
-  redirectUnauthorized = null // null pour redirection automatique basée sur le rôle
+  redirectUnauthenticated = "/login", // Changé de "/connexion" à "/login"
+  redirectUnauthorized = null
 }) => {
-  const { isAuthenticated, user, loading, getRedirectPath } = useAuth();
+  const { isAuthenticated, user, loading } = useAuth();
   const location = useLocation();
 
-  // Composant de chargement amélioré
+  // Gestion du chargement
   if (loading) {
     return (
       <Box 
-        sx={{ 
-          display: 'flex', 
-          justifyContent: 'center', 
-          alignItems: 'center', 
+        sx={{
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
           minHeight: '100vh',
           flexDirection: 'column',
           gap: 2
@@ -44,15 +46,19 @@ const ProtectedRoute = ({
     );
   }
 
-  // Vérification des rôles si spécifiés
-  if (roles.length > 0 && (!user?.role || !roles.includes(user.role))) {
-    // Si redirectUnauthorized n'est pas spécifié, utiliser la redirection basée sur le rôle
-    const finalRedirect = redirectUnauthorized || getRedirectPath(user.role);
-    return <Navigate to={finalRedirect} replace />;
+  // Gestion des rôles - redirection immédiate si non autorisé
+  if (roles.length > 0 && user?.type && !roles.includes(user.type)) {
+    const finalRedirect = redirectUnauthorized || getRedirectPath(user.type);
+    return (
+      <Navigate 
+        to={finalRedirect}
+        replace
+      />
+    );
   }
 
-  // Rendu des enfants si toutes les vérifications passent
-  return children;
+  // CORRECTION: Utiliser Outlet au lieu de children pour les routes imbriquées
+  return children || <Outlet />;
 };
 
 // Composant spécialisé pour les routes admin
@@ -65,6 +71,27 @@ export const AdminRoute = ({ children }) => (
 // Composant spécialisé pour les routes client
 export const ClientRoute = ({ children }) => (
   <ProtectedRoute roles={['client']}>
+    {children}
+  </ProtectedRoute>
+);
+
+// Composant pour les routes caissier
+export const CashierRoute = ({ children }) => (
+  <ProtectedRoute roles={['cashier']}>
+    {children}
+  </ProtectedRoute>
+);
+
+// Composant pour les routes stockist
+export const StockistRoute = ({ children }) => (
+  <ProtectedRoute roles={['stockist']}>
+    {children}
+  </ProtectedRoute>
+);
+
+// Composant pour les routes manager
+export const ManagerRoute = ({ children }) => (
+  <ProtectedRoute roles={['manager']}>
     {children}
   </ProtectedRoute>
 );

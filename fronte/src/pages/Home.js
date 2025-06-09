@@ -8,18 +8,51 @@ import {
   Grid,
   Card,
   CardContent,
+  CardMedia,
   useTheme,
   useMediaQuery,
-  AppBar
+  AppBar,
+  Paper,
+  styled
 } from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import { 
   Storefront as StorefrontIcon, 
-  ShoppingCart as CartIcon, 
-  LocalOffer as OfferIcon, 
+  ShoppingCart, 
+  LocalOffer, 
   Security as SecurityIcon 
 } from '@mui/icons-material';
+
+const HeroSection = styled(Box)(({ theme }) => ({
+  background: `linear-gradient(135deg, ${theme.palette.primary.main} 0%, ${theme.palette.primary.dark} 100%)`,
+  color: 'white',
+  padding: theme.spacing(8, 0),
+  borderRadius: theme.spacing(2),
+  marginBottom: theme.spacing(4),
+}));
+
+const FeatureCard = styled(Card)(({ theme }) => ({
+  height: '100%',
+  display: 'flex',
+  flexDirection: 'column',
+  justifyContent: 'center',
+  alignItems: 'center',
+  padding: theme.spacing(4),
+  transition: 'transform 0.3s ease',
+  '&:hover': {
+    transform: 'translateY(-5px)',
+    boxShadow: theme.shadows[6],
+  },
+}));
+
+const StyledButton = styled(Button)(({ theme }) => ({
+  borderRadius: theme.spacing(2),
+  padding: theme.spacing(1.5, 4),
+  textTransform: 'none',
+  fontSize: '1.1rem',
+  fontWeight: 600,
+}));
 
 const Home = () => {
   const theme = useTheme();
@@ -27,23 +60,7 @@ const Home = () => {
   const navigate = useNavigate();
   const { isAuthenticated } = useAuth();
 
-  const features = [
-    {
-      title: 'Produits Frais',
-      description: 'Une large sélection de produits frais et de qualité.',
-      icon: <CartIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-    },
-    {
-      title: 'Livraison Rapide',
-      description: 'Livraison à domicile rapide et sécurisée.',
-      icon: <OfferIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-    },
-    {
-      title: 'Programme Fidélité',
-      description: 'Gagnez des points et profitez de réductions exclusives.',
-      icon: <SecurityIcon sx={{ fontSize: 40, color: 'primary.main', mb: 2 }} />
-    }
-  ];
+  const features = [];
 
   const handleNavigation = (path) => {
     if (isAuthenticated && (path === '/Login' || path === '/Register')) {
@@ -54,65 +71,75 @@ const Home = () => {
   };
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static" sx={{ display: 'flex', flexDirection: 'row', alignItems: 'center', p: 1 }}>
-        <StorefrontIcon sx={{ mr: 1 }} />
-        <Typography variant="h6" component="h1" sx={{ fontWeight: 'bold' }}>App Superette</Typography>
-      </AppBar>
-
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Box sx={{ textAlign: 'center', mb: 6 }}>
-          <StorefrontIcon sx={{ fontSize: 60, color: 'primary.main', mb: 2 }} />
-          <Typography variant="h3" component="h1" gutterBottom>
-            Bienvenue sur App Superette
-          </Typography>
-          <Typography variant="h5" color="text.secondary" paragraph>
-            Votre superette en ligne, simple et efficace
-          </Typography>
-          
-          <Grid container spacing={2} justifyContent="center" sx={{ mt: 4 }}>
-            <Grid item>
-              <Button
-                variant="contained"
-                size="large"
-                onClick={() => handleNavigation('/boutique')}
-                sx={{ minWidth: 200 }}
-              >
-                Commencer vos achats
-              </Button>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      <HeroSection>
+        <Container maxWidth="lg">
+          <Box sx={{ textAlign: 'center', mb: 6 }}>
+            <StorefrontIcon sx={{ fontSize: 80, mb: 2 }} />
+            <Typography variant="h2" component="h1" gutterBottom sx={{ fontWeight: 700 }}>
+              Bienvenue sur App Superette
+            </Typography>
+            <Typography variant="h5" sx={{ mb: 4, maxWidth: 600, mx: 'auto' }}>
+              App Superette - Simple et efficace
+            </Typography>
+            
+            <Grid container spacing={3} justifyContent="center" sx={{ mt: 4 }}>
+              {!isAuthenticated && (
+                <>
+                  <Grid item>
+                    <StyledButton
+                      variant="contained"
+                      color="secondary"
+                      size="large"
+                      onClick={() => handleNavigation('/login')}
+                      sx={{ minWidth: 200 }}
+                    >
+                      Se connecter
+                    </StyledButton>
+                  </Grid>
+                  <Grid item>
+                    <StyledButton
+                      variant="outlined"
+                      color="secondary"
+                      size="large"
+                      onClick={() => handleNavigation('/register')}
+                      sx={{ minWidth: 200 }}
+                    >
+                      S'inscrire
+                    </StyledButton>
+                  </Grid>
+                </>
+              )}
             </Grid>
-            {!isAuthenticated && (
-              <>
-                <Grid item>
-                  <Button
-                    variant="outlined"
-                    size="large"
-                    onClick={() => handleNavigation('/login')}
-                    sx={{ minWidth: 200 }}
-                  >
-                    Se connecter
-                  </Button>
-                </Grid>
-                <Grid item>
-                  <Button
-                    variant="text"
-                    size="large"
-                    onClick={() => handleNavigation('/register')}
-                    sx={{ minWidth: 200 }}
-                  >
-                    S'inscrire
-                  </Button>
-                </Grid>
-              </>
-            )}
-          </Grid>
-        </Box>
+          </Box>
+        </Container>
+      </HeroSection>
 
-        {/* Features Grid */}
+      <Container maxWidth="lg" sx={{ mt: 8, mb: 6 }}>
+        <Typography variant="h4" gutterBottom sx={{ mb: 4, textAlign: 'center' }}>
+          Pourquoi choisir App Superette ?
+        </Typography>
+        
         <Grid container spacing={4}>
-          {features.map((feature, index) => (
+          {[
+            {
+              title: 'Achats Faciles',
+              description: 'Commandez en quelques clics',
+              icon: <ShoppingCart sx={{ fontSize: 40, mb: 2 }} />
+            },
+            {
+              title: 'Livraison Rapide',
+              description: 'Recevez vos courses rapidement',
+              icon: <LocalOffer sx={{ fontSize: 40, mb: 2 }} />
+            },
+            {
+              title: 'Sécurité',
+              description: 'Paiement et livraison sécurisés',
+              icon: <SecurityIcon sx={{ fontSize: 40, mb: 2 }} />
+            }
+          ].map((feature, index) => (
             <Grid item xs={12} md={4} key={index}>
-              <Card sx={{ height: '100%' }}>
+              <FeatureCard>
                 <CardContent sx={{ textAlign: 'center', height: '100%' }}>
                   {feature.icon}
                   <Typography variant="h5" component="h2" gutterBottom>
@@ -122,7 +149,7 @@ const Home = () => {
                     {feature.description}
                   </Typography>
                 </CardContent>
-              </Card>
+              </FeatureCard>
             </Grid>
           ))}
         </Grid>

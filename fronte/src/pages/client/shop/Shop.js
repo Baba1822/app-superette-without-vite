@@ -299,7 +299,7 @@ const HomePage = () => {
       <AppBar position="static" color="primary">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            Superette XYZ
+            App Superette
           </Typography>
           
           <IconButton color="inherit" onClick={() => navigate('/profile')}>
@@ -678,7 +678,7 @@ const HomePage = () => {
       <Box component="footer" sx={{ bgcolor: 'primary.main', color: 'white', p: 2, mt: 'auto' }}>
         <Container maxWidth="lg">
           <Typography variant="body2" align="center">
-            2023 Superette XYZ - Tous droits réservés
+            2023 App Superette - Tous droits réservés
           </Typography>
         </Container>
       </Box>

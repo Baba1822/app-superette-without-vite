@@ -6,10 +6,65 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
 const AuthContext = createContext();
 
+const getRedirectPath = (userRole, from = null, redirectUrl = null) => {
+  // Si une redirection spécifique était prévue (from), on la respecte
+  if (from && from !== '/login' && from !== '/register' && from !== '/connexion') {
+    return from;
+  }
+
+  // Si on a un redirectUrl spécifique, on l'utilise
+  if (redirectUrl) {
+    return redirectUrl;
+  }
+
+  // Redirection basée sur le rôle selon vos routes définies
+  switch (userRole) {
+    case 'admin':
+      return '/administration';
+    case 'client':
+      return '/Shop';
+    case 'cashier':
+      return '/caisse';
+    case 'stockist':
+      return '/inventaire';
+    case 'manager':
+      return '/finances';
+    default:
+      return '/';
+  }
+};
+
+export { getRedirectPath };
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+
+  // Vérification initiale du token
+  useEffect(() => {
+    const checkAuth = async () => {
+      const token = localStorage.getItem('token');
+      if (token) {
+        try {
+          const decoded = jwtDecode(token);
+          setUser({
+            id: decoded.id,
+            email: decoded.email,
+            prenom: decoded.prenom,
+            nom: decoded.nom,
+            type: decoded.type || decoded.role
+          });
+        } catch (error) {
+          console.error('Erreur de décodage du token:', error);
+          logout();
+        }
+      }
+      setLoading(false);
+    };
+
+    checkAuth();
+  }, []);
 
   const apiRequest = async (endpoint, options = {}) => {
     try {
@@ -43,30 +98,6 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // Fonction pour déterminer la redirection basée sur le rôle
-  const getRedirectPath = (userRole, from = null) => {
-    // Si une redirection spécifique était prévue (from), on la respecte
-    if (from && from !== '/login' && from !== '/register' && from !== '/connexion') {
-      return from;
-    }
-
-    // Redirection basée sur le rôle selon vos routes définies
-    switch (userRole) {
-      case 'admin':
-        return '/administration'; // Route vers AdminLayout avec Dashboard par défaut
-      case 'client':
-        return '/Shop'; // Route vers Shop dans CustomerLayout
-      case 'cashier':
-        return '/caisse';
-      case 'stockist':
-        return '/inventaire';
-      case 'manager':
-        return '/finances';
-      default:
-        return '/';
-    }
-  };
-
   const login = async (credentials) => {
     try {
       if (!credentials.email || !credentials.motdepasse) {
@@ -74,14 +105,18 @@ export const AuthProvider = ({ children }) => {
       }
 
       const loginData = {
-        email: credentials.email.toLowerCase().trim(),
+        email: credentials.email.trim(),
         motdepasse: credentials.motdepasse
       };
 
-      const response = await apiRequest('/auth/login', {
+      setLoading(true);
+      
+      const response = await apiRequest('/api/auth/login', {
         method: 'POST',
         body: loginData
       });
+
+      setLoading(false);
 
       if (response.success && response.token) {
         localStorage.setItem('token', response.token);
@@ -90,13 +125,14 @@ export const AuthProvider = ({ children }) => {
         }
         setUser(response.user);
         setError('');
-        toast.success('Connexion réussie !');
         
-        // Retourner les informations de redirection basées sur le rôle
+        // CORRECTION: Calculer le redirectPath ici si pas fourni par le serveur
+        const redirectPath = response.redirectPath || getRedirectPath(response.user.type);
+        
         return { 
           success: true, 
           user: response.user,
-          redirectPath: getRedirectPath(response.user.role)
+          redirectPath: redirectPath
         };
       } else {
         throw new Error(response.message || 'Échec de la connexion');
@@ -106,6 +142,7 @@ export const AuthProvider = ({ children }) => {
       const errorMessage = error.message || 'Email ou mot de passe incorrect';
       setError(errorMessage);
       toast.error(errorMessage);
+      setLoading(false);
       return { success: false, message: errorMessage };
     }
   };
@@ -120,18 +157,9 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Le mot de passe doit contenir au moins 6 caractères');
       }
 
-      const registerData = {
-        prenom: userData.prenom.trim(),
-        nom: userData.nom ? userData.nom.trim() : '',
-        email: userData.email.toLowerCase().trim(),
-        telephone: userData.telephone ? userData.telephone.trim() : '',
-        motdepasse: userData.motdepasse,
-        role: 'client'
-      };
-
-      const response = await apiRequest('/auth/register', {
+      const response = await apiRequest('/api/auth/register', {
         method: 'POST',
-        body: registerData
+        body: userData
       });
 
       if (response.success && response.token) {
@@ -142,12 +170,15 @@ export const AuthProvider = ({ children }) => {
         setUser(response.user);
         setError('');
         toast.success('Inscription réussie !');
-        
-        // Retourner les informations de redirection basées sur le rôle
+
+        // CORRECTION: Retourner les données pour permettre la navigation côté composant
+        // au lieu d'utiliser window.location.href
+        const redirectPath = response.redirectUrl || getRedirectPath(response.user.type);
+
         return { 
           success: true, 
           user: response.user,
-          redirectPath: getRedirectPath(response.user.role)
+          redirectUrl: redirectPath
         };
       } else {
         throw new Error(response.message || 'Échec de l\'inscription');
@@ -156,7 +187,7 @@ export const AuthProvider = ({ children }) => {
       console.error('Erreur register:', error);
       setError(error.message);
       toast.error(error.message);
-      return { success: false, message: error.message };
+      throw error;
     }
   };
 
@@ -175,7 +206,7 @@ export const AuthProvider = ({ children }) => {
         throw new Error('Pas de refresh token');
       }
 
-      const response = await apiRequest('/auth/refresh', {
+      const response = await apiRequest('/api/auth/refresh', {
         method: 'POST',
         body: { refreshToken }
       });
@@ -217,7 +248,7 @@ export const AuthProvider = ({ children }) => {
               email: newDecoded.email,
               prenom: newDecoded.prenom,
               nom: newDecoded.nom,
-              role: newDecoded.role
+              type: newDecoded.type || newDecoded.role // CORRECTION: Support pour type et role
             });
           } catch (refreshError) {
             logout();
@@ -228,10 +259,11 @@ export const AuthProvider = ({ children }) => {
             email: decoded.email,
             prenom: decoded.prenom,
             nom: decoded.nom,
-            role: decoded.role
+            type: decoded.type || decoded.role // CORRECTION: Support pour type et role
           });
         }
       } catch (error) {
+        console.error('Erreur lors de la vérification auth:', error);
         logout();
       } finally {
         setLoading(false);

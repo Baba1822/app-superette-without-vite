@@ -8,13 +8,19 @@ import {
   Badge
 } from '@mui/material';
 import {
+  Assessment as AssessmentIcon,
+  ShoppingCart as CartIcon,
   Dashboard as DashboardIcon,
+  LocalShipping as DeliveryIcon,
   Inventory as InventoryIcon,
+  LocalMall as LocalMallIcon,
+  CardMembership as LoyaltyIcon,
   People as PeopleIcon,
-  ShoppingCart as OrdersIcon,
-  LocalOffer as PromotionsIcon,
-  Settings as SettingsIcon,
-  Assessment as StatsIcon
+  Person as PersonIcon,
+  Store as StoreIcon,
+  Receipt as OrderIcon,
+  Payment as PaymentIcon,
+  Settings as SettingsIcon
 } from '@mui/icons-material';
 import { Link } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
@@ -41,29 +47,54 @@ const AdminNavigation = () => {
     },
     {
       texte: 'Produits',
-      icone: <InventoryIcon />,
+      icone: <LocalMallIcon />,
       chemin: '/administration/produits'
     },
     {
+      texte: 'Clientèle',
+      icone: <PersonIcon />,
+      chemin: '/administration/clients'
+    },
+    {
+      texte: 'Ventes',
+      icone: <CartIcon />,
+      chemin: '/administration/ventes'
+    },   
+    {
       texte: 'Commandes',
-      icone: <OrdersIcon />,
+      icone: <OrderIcon />,
       chemin: '/administration/commandes',
       badge: commandesEnAttente
     },
     {
-      texte: 'Clients',
+      texte: 'Paiements',
+      icone: <PaymentIcon />,
+      chemin: '/administration/paiements'
+    },
+    {
+      texte: 'Fournisseurs',
+      icone: <StoreIcon />,
+      chemin: '/administration/fournisseurs'
+    },
+    {
+      texte: 'Employés',
       icone: <PeopleIcon />,
-      chemin: '/administration/clients'
+      chemin: '/administration/employes'
     },
     {
-      texte: 'Promotions',
-      icone: <PromotionsIcon />,
-      chemin: '/administration/promotions'
-    },
-    {
-      texte: 'Statistiques',
-      icone: <StatsIcon />,
+      texte: 'Rapports',
+      icone: <AssessmentIcon />,
       chemin: '/administration/rapports'
+    },
+    {
+      texte: 'Fidélité',
+      icone: <LoyaltyIcon />,
+      chemin: '/administration/fidelite'
+    },
+    {
+      texte: 'Livraisons',
+      icone: <DeliveryIcon />,
+      chemin: '/administration/livraisons'
     },
     {
       texte: 'Paramètres',
