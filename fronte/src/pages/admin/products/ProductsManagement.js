@@ -12,6 +12,7 @@ import {
   Avatar,
   Box,
   Button,
+  ButtonGroup,
   Chip,
   CircularProgress,
   Collapse,
@@ -23,7 +24,9 @@ import {
   FormControl,
   FormControlLabel,
   FormLabel,
+  Grid,
   IconButton,
+  InputAdornment,
   Paper,
   Radio,
   RadioGroup,
@@ -40,7 +43,8 @@ import {
   TextField,
   Tooltip,
   Typography,
-  MenuItem
+  MenuItem,
+  Pagination
 } from '@mui/material';
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
@@ -66,7 +70,6 @@ const ITEMS_PER_PAGE = 10;
 
 const ProductsManagement = () => {
   const queryClient = useQueryClient();
-// Supprimer l'état data et utiliser directement le useQuery
 
   const [filters, setFilters] = useState({
     seasonalOnly: false,
@@ -81,7 +84,6 @@ const ProductsManagement = () => {
   const [form, setForm] = useState({
     name: '',
     category: '',
-    location: '',
     price: '',
     quantity: '',
     description: '',
@@ -95,6 +97,7 @@ const ProductsManagement = () => {
     promotionValue: '',
     promotionStart: null,
     promotionEnd: null,
+    datePeremption: null,
   });
 
   const [errors, setErrors] = useState({});
@@ -180,7 +183,6 @@ const ProductsManagement = () => {
     setForm({
       name: item?.name || '',
       category: item?.category || '',
-      location: item?.location || '',
       price: item?.price?.toString() || '',
       quantity: item?.quantity?.toString() || '',
       description: item?.description || '',
@@ -194,6 +196,7 @@ const ProductsManagement = () => {
       promotionValue: item?.promotionValue?.toString() || '',
       promotionStart: item?.promotionStart ? new Date(item.promotionStart) : null,
       promotionEnd: item?.promotionEnd ? new Date(item.promotionEnd) : null,
+      datePeremption: item?.datePeremption ? new Date(item.datePeremption) : null,
     });
     
     setDialog({ open: true, item });
@@ -203,12 +206,9 @@ const ProductsManagement = () => {
   };
 
   const handleCloseDialog = () => {
-    setDialog({ open: false, item: null });
-    setSelectedProduct(null);
     setForm({
       name: '',
       category: '',
-      location: '',
       price: '',
       quantity: '',
       description: '',
@@ -222,99 +222,95 @@ const ProductsManagement = () => {
       promotionValue: '',
       promotionStart: null,
       promotionEnd: null,
+      datePeremption: null,
     });
-    setErrors({});
+    setDialog({ open: false, item: null });
+    setSelectedProduct(null);
     setImageFile(null);
+    setErrors({});
   };
 
   // Handle form changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
-    setErrors(prev => ({ ...prev, [name]: undefined }));
   };
 
   const handleSwitchChange = (e) => {
-    const { name, checked } = e.target;
-    setForm(prev => ({ ...prev, [name]: checked }));
+    const { name } = e.target;
+    setForm(prev => ({ ...prev, [name]: !prev[name] }));
   };
 
   const handleImageChange = (e) => {
-    if (e.target.files[0]) {
-      setImageFile(e.target.files[0]);
+    const file = e.target.files[0];
+    if (file) {
+      setImageFile(file);
+      setForm(prev => ({ ...prev, image: URL.createObjectURL(file) }));
     }
   };
 
   // Form validation
   const validateForm = () => {
     const newErrors = {};
-
-    if (!form.name.trim()) newErrors.name = 'Name required';
-    if (!form.category) newErrors.category = 'Category required';
-    if (!form.location) newErrors.location = 'Location required';
-    if (!form.price) newErrors.price = 'Price required';
-    if (!form.quantity) newErrors.quantity = 'Quantity required';
-    if (!form.alertThreshold) newErrors.alertThreshold = 'Threshold required';
-
+    
+    if (!form.name.trim()) newErrors.name = 'Le nom est requis';
+    if (!form.category) newErrors.category = 'La catégorie est requise';
+    if (!form.price) newErrors.price = 'Le prix est requis';
+    if (!form.quantity) newErrors.quantity = 'Le stock est requis';
+    if (!form.alertThreshold) newErrors.alertThreshold = 'Le seuil d\'alerte est requis';
+    
     if (form.isSeasonal) {
-      if (!form.seasonStart) newErrors.seasonStart = 'Start date required';
-      if (!form.seasonEnd) newErrors.seasonEnd = 'End date required';
-      if (form.seasonStart && form.seasonEnd && form.seasonStart > form.seasonEnd) {
-        newErrors.seasonEnd = 'End date must be after start date';
-      }
+      if (!form.seasonStart) newErrors.seasonStart = 'La date de début est requise';
+      if (!form.seasonEnd) newErrors.seasonEnd = 'La date de fin est requise';
     }
 
     if (form.hasPromotion) {
-      if (!form.promotionValue) newErrors.promotionValue = 'Promotion value required';
-      if (!form.promotionStart) newErrors.promotionStart = 'Start date required';
-      if (!form.promotionEnd) newErrors.promotionEnd = 'End date required';
-      if (form.promotionStart && form.promotionEnd && form.promotionStart > form.promotionEnd) {
-        newErrors.promotionEnd = 'End date must be after start date';
+      if (!form.promotionType) newErrors.promotionType = 'Le type de promotion est requis';
+      if (!form.promotionValue) newErrors.promotionValue = 'La valeur de promotion est requise';
+      if (!form.promotionStart) newErrors.promotionStart = 'La date de début est requise';
+      if (!form.promotionEnd) newErrors.promotionEnd = 'La date de fin est requise';
+      
+      if (form.promotionType === 'percentage' && form.promotionValue) {
+        const value = parseFloat(form.promotionValue);
+        if (value <= 0 || value > 100) {
+          newErrors.promotionValue = 'Le pourcentage doit être entre 1 et 100';
+        }
       }
     }
-
+    
     setErrors(newErrors);
     return Object.keys(newErrors).length === 0;
   };
 
   // Form submission
-  const handleSubmit = async (e) => {
+  const handleSubmit = (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    try {
-      const productData = {
-        ...form,
-        price: parseFloat(form.price),
-        quantity: parseInt(form.quantity),
-        alertThreshold: parseInt(form.alertThreshold)
-      };
+    const formData = {
+      ...form,
+      price: parseFloat(form.price),
+      quantity: parseInt(form.quantity),
+      alertThreshold: parseInt(form.alertThreshold),
+      promotionValue: form.promotionValue ? parseFloat(form.promotionValue) : null,
+      seasonStart: form.seasonStart?.toISOString(),
+      seasonEnd: form.seasonEnd?.toISOString(),
+      promotionStart: form.promotionStart?.toISOString(),
+      promotionEnd: form.promotionEnd?.toISOString(),
+      datePeremption: form.datePeremption?.toISOString(),
+    };
 
-      if (selectedProduct) {
-        await updateMutation.mutateAsync(productData);
-      } else {
-        const newProduct = await createMutation.mutateAsync(productData);
-        if (imageFile) {
-          await uploadImageMutation.mutateAsync({
-            id: newProduct.id,
-            file: imageFile
-          });
-        }
-      }
-    } catch (err) {
-      console.error('Error:', err);
+    if (selectedProduct) {
+      updateMutation.mutate(formData);
+    } else {
+      createMutation.mutate(formData);
     }
   };
 
   // Delete product
-  const deleteProduct = async (id) => {
-    if (!window.confirm('Delete this product?')) return;
-
-    try {
-      await deleteMutation.mutateAsync(id);
-    } catch (err) {
-      console.error('Error deleting:', err);
-      showNotification('Error deleting product', 'error');
+  const deleteProduct = (id) => {
+    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
+      deleteMutation.mutate(id);
     }
   };
 
@@ -324,7 +320,7 @@ const ProductsManagement = () => {
   };
 
   const closeNotification = () => {
-    setNotification(prev => ({ ...prev, open: false }));
+    setNotification({ open: false, message: '', severity: 'success' });
   };
 
   // Utility functions
@@ -332,517 +328,444 @@ const ProductsManagement = () => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'GNF'
-    }).format(parseFloat(price));
+    }).format(price);
   };
 
   const getStockStatus = (quantity, alertThreshold) => {
-    const qty = parseInt(quantity);
-    const threshold = parseInt(alertThreshold);
-    
-    if (qty === 0) return { text: 'Out of stock', color: 'error' };
-    if (qty <= threshold) return { text: 'Low stock', color: 'warning' };
-    return { text: 'In stock', color: 'success' };
+    if (!quantity) return 'error';
+    if (quantity <= alertThreshold) return 'warning';
+    return 'success';
   };
 
-// Déjà corrigé dans le bloc précédent
+  // Filtrer les produits
+  const getFilteredProducts = () => {
+    if (!Array.isArray(products)) return [];
+    const { seasonalOnly, promotionsOnly } = filters;
+    return products.filter(product => {
+      if (seasonalOnly && !product.isSeasonal) return false;
+      if (promotionsOnly && !product.hasPromotion) return false;
+      return true;
+    });
+  };
 
-  // Render content
-  const renderContent = () => {
-    if (isLoading && filteredProducts.length === 0) {
-      return (
-        <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '50vh' }}>
-          <CircularProgress size={60} />
-        </Box>
-      );
-    }
-
-    if (error) {
-      return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', textAlign: 'center' }}>
-          <Typography variant="h6" color="error" gutterBottom>
-            Loading error
-          </Typography>
-          <Typography variant="body1" color="textSecondary" sx={{ mb: 2 }}>
-            {error.message || 'An error occurred while loading products'}
-          </Typography>
-          <Button variant="outlined" onClick={() => window.location.reload()}>
-            Retry
-          </Button>
-        </Box>
-      );
-    }
-
-    if (filteredProducts.length === 0) {
-      return (
-        <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '50vh', textAlign: 'center' }}>
-          <Typography variant="h6" color="textSecondary" gutterBottom>
-            No products found
-          </Typography>
-          <Button
-            variant="outlined"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenDialog()}
-            disabled={isLoading}
-          >
-            Add product
-          </Button>
-        </Box>
-      );
-    }
-
+  // Render form content
+  const renderFormContent = () => {
     return (
-      <TableContainer component={Paper} sx={{ maxHeight: 'calc(100vh - 200px)', overflow: 'auto' }}>
-        <Table stickyHeader>
-          <TableHead>
-            <TableRow>
-              <TableCell sx={{ width: '80px' }}>Image</TableCell>
-              <TableCell>Name</TableCell>
-              <TableCell>Category</TableCell>
-              <TableCell>Location</TableCell>
-              <TableCell>Price</TableCell>
-              <TableCell align="right">Quantity</TableCell>
-              <TableCell>Status</TableCell>
-              <TableCell>Seasonal</TableCell>
-              <TableCell>Promo</TableCell>
-              <TableCell>Actions</TableCell>
-            </TableRow>
-          </TableHead>
-          <TableBody>
-            {filteredProducts.map((product) => (
-              <TableRow key={product.id} hover>
-                <TableCell>
-                  <Avatar 
-                    src={product.image} 
-                    alt={product.name}
-                    sx={{ width: 50, height: 50 }}
-                    variant="rounded"
-                  >
-                    {!product.image && product.name.charAt(0)}
-                  </Avatar>
-                </TableCell>
-                <TableCell>
-                  <Typography fontWeight="medium">{product.name}</Typography>
-                  {product.description && (
-                    <Typography variant="body2" color="text.secondary">
-                      {product.description.substring(0, 30)}...
-                    </Typography>
-                  )}
-                </TableCell>
-                <TableCell>
-                  <Chip label={product.category} size="small" />
-                </TableCell>
-                <TableCell>{product.location}</TableCell>
-                <TableCell>
-                  {product.hasPromotion ? (
-                    <>
-                      <Typography sx={{ textDecoration: 'line-through', color: 'text.secondary' }}>
-                        {formatPrice(product.price)}
-                      </Typography>
-                      <Typography color="secondary">
-                        {formatPrice(product.price * (1 - (product.promotionType === 'percentage' ? product.promotionValue/100 : product.promotionValue)))}
-                      </Typography>
-                    </>
-                  ) : (
-                    formatPrice(product.price)
-                  )}
-                </TableCell>
-                <TableCell align="right">
-                  <Chip 
-                    label={getStockStatus(product.quantity, product.alertThreshold).text}
-                    color={getStockStatus(product.quantity, product.alertThreshold).color}
-                    size="small"
-                  />
-                </TableCell>
-                <TableCell>
-                  {product.isSeasonal ? (
-                    <Tooltip title={`Seasonal: ${new Date(product.seasonStart).toLocaleDateString()} - ${new Date(product.seasonEnd).toLocaleDateString()}`}>
-                      <EventIcon color="primary" />
-                    </Tooltip>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  {product.hasPromotion ? (
-                    <Tooltip title={`Promotion: ${product.promotionValue}${product.promotionType === 'percentage' ? '%' : 'GNF'} (${new Date(product.promotionStart).toLocaleDateString()} - ${new Date(product.promotionEnd).toLocaleDateString()})`}>
-                      <LocalOfferIcon color="secondary" />
-                    </Tooltip>
-                  ) : null}
-                </TableCell>
-                <TableCell>
-                  <Box sx={{ display: 'flex', gap: 1 }}>
-                    <Tooltip title="Edit">
-                      <IconButton 
-                        onClick={() => handleOpenDialog(product)}
-                        color="primary"
-                      >
-                        <EditIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <Tooltip title="Delete">
-                      <IconButton 
-                        onClick={() => deleteProduct(product.id)}
-                        color="error"
-                      >
-                        <DeleteIcon />
-                      </IconButton>
-                    </Tooltip>
-                  </Box>
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </TableContainer>
-    );
-  };
-
-  // Filtrer les produits avec les données de useQuery
-  const filteredProducts = Array.isArray(products) 
-    ? products.filter(product => {
-        const { seasonalOnly, promotionsOnly } = filters;
-        
-        if (seasonalOnly && !product.isSeasonal) return false;
-        if (promotionsOnly && !product.hasPromotion) return false;
-        
-        return true;
-      })
-    : [];
-
-  return (
-    <Box sx={{ p: 3 }}>
-      {/* Header */}
-      <Box sx={{ mb: 3, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-        <Typography variant="h4" component="h1">
-          Products Management
-        </Typography>
-        <Button
-          variant="contained"
-          startIcon={<AddIcon />}
-          onClick={() => handleOpenDialog()}
-          sx={{ height: 'fit-content' }}
-        >
-          Add product
-        </Button>
-      </Box>
-
-      {/* Filters */}
-      <Box sx={{ display: 'flex', gap: 2, mb: 3 }}>
-        <FormControlLabel
-          control={
-            <Switch
-              checked={filters.seasonalOnly}
-              onChange={(e) => handleFilterChange('seasonalOnly', e.target.checked)}
-              color="primary"
-            />
-          }
-          label="Seasonal"
-        />
-
-        <FormControlLabel
-          control={
-            <Switch
-              checked={filters.promotionsOnly}
-              onChange={(e) => handleFilterChange('promotionsOnly', e.target.checked)}
-              color="secondary"
-            />
-          }
-          label="Promotions"
-        />
-      </Box>
-
-      {/* Content */}
-      {renderContent()}
-
-      {/* Edit/Add dialog */}
-      <Dialog 
-        open={dialog.open} 
-        onClose={handleCloseDialog} 
-        fullWidth 
-        maxWidth="md"
-        PaperProps={{ component: 'form', onSubmit: handleSubmit }}
-      >
-        <DialogTitle>
-          {selectedProduct ? 'Edit' : 'Add'} product
-        </DialogTitle>
-        <DialogContent dividers>
-          {isLoading ? (
-            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '200px' }}>
-              <CircularProgress />
-            </Box>
-          ) : (
-            <Box sx={{ mt: 2 }}>
-              {errors.error && (
-                <Alert severity="error" sx={{ mb: 2 }}>
-                  {errors.error}
-                </Alert>
-              )}
+      <Box sx={{ display: 'grid', gap: 1, mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+        {/* Informations de base */}
+        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Informations de base</Typography>
+          <Grid container spacing={0.5}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                margin="normal"
+                label="Nom"
                 name="name"
-                label="Name"
                 value={form.name}
                 onChange={handleInputChange}
                 error={!!errors.name}
                 helperText={errors.name}
                 required
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
               />
-              
+            </Grid>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                margin="normal"
+                label="Catégorie"
                 name="category"
-                label="Category"
                 value={form.category}
                 onChange={handleInputChange}
                 error={!!errors.category}
                 helperText={errors.category}
                 required
-              />
-
+                select
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+              >
+                <MenuItem value="">Sélectionner une catégorie</MenuItem>
+                <MenuItem value="1">Produits frais</MenuItem>
+                <MenuItem value="2">Produits secs</MenuItem>
+                <MenuItem value="3">Boissons</MenuItem>
+              </TextField>
+            </Grid>
+            <Grid item xs={12}>
               <TextField
                 fullWidth
-                margin="normal"
-                name="location"
-                label="Location"
-                value={form.location}
+                label="Description"
+                name="description"
+                value={form.description}
                 onChange={handleInputChange}
-                error={!!errors.location}
-                helperText={errors.location}
-                required
+                error={!!errors.description}
+                helperText={errors.description}
+                multiline
+                rows={2}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
               />
+            </Grid>
+          </Grid>
+        </Box>
 
+        {/* Prix et Stock */}
+        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Prix et Stock</Typography>
+          <Grid container spacing={0.5}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                margin="normal"
+                label="Prix"
                 name="price"
-                label="Price (GNF)"
                 type="number"
                 value={form.price}
                 onChange={handleInputChange}
                 error={!!errors.price}
                 helperText={errors.price}
                 required
-                inputProps={{ step: "0.01", min: "0.01" }}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+                InputProps={{
+                  startAdornment: <InputAdornment position="start">GNF</InputAdornment>,
+                  sx: { fontSize: '0.8rem' }
+                }}
               />
-              
-              <Box sx={{ display: 'flex', gap: 2 }}>
-                <TextField
-                  fullWidth
-                  margin="normal"
-                  name="quantity"
-                  label="Quantity"
-                  type="number"
-                  value={form.quantity}
-                  onChange={handleInputChange}
-                  error={!!errors.quantity}
-                  helperText={errors.quantity}
-                  required
-                  inputProps={{ min: "0" }}
-                />
-                <TextField
-                  fullWidth
-                  margin="normal"
-                  name="alertThreshold"
-                  label="Alert threshold"
-                  type="number"
-                  value={form.alertThreshold}
-                  onChange={handleInputChange}
-                  error={!!errors.alertThreshold}
-                  helperText={errors.alertThreshold}
-                  required
-                  inputProps={{ min: "0" }}
-                />
-              </Box>
-              
+            </Grid>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                margin="normal"
-                name="description"
-                label="Description"
-                multiline
-                rows={3}
-                value={form.description}
+                label="Stock"
+                name="quantity"
+                type="number"
+                value={form.quantity}
                 onChange={handleInputChange}
+                error={!!errors.quantity}
+                helperText={errors.quantity}
+                required
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
               />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Seuil d'alerte"
+                name="alertThreshold"
+                type="number"
+                value={form.alertThreshold}
+                onChange={handleInputChange}
+                error={!!errors.alertThreshold}
+                helperText={errors.alertThreshold}
+                required
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+              />
+            </Grid>
+          </Grid>
+        </Box>
 
-              <Box sx={{ mt: 2 }}>
-                <input 
-                  type="file" 
-                  accept="image/*" 
+        {/* Date et Image */}
+        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Date et Image</Typography>
+          <Grid container spacing={0.5}>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Date de péremption"
+                name="datePeremption"
+                type="date"
+                value={form.datePeremption ? form.datePeremption.toISOString().split('T')[0] : ''}
+                onChange={(e) => setForm(prev => ({ ...prev, datePeremption: e.target.value ? new Date(e.target.value) : null }))}
+                error={!!errors.datePeremption}
+                helperText={errors.datePeremption}
+                InputLabelProps={{ shrink: true }}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Image URL"
+                name="image"
+                value={form.image}
+                onChange={handleInputChange}
+                error={!!errors.image}
+                helperText={errors.image}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <Button
+                variant="contained"
+                component="label"
+                fullWidth
+                size="small"
+                sx={{ fontSize: '0.8rem', height: '2.5rem' }}
+              >
+                Upload Image
+                <input
+                  type="file"
+                  hidden
+                  accept="image/*"
                   onChange={handleImageChange}
-                  style={{ display: 'none' }}
-                  id="image-upload"
                 />
-                <label htmlFor="image-upload">
-                  <Button variant="outlined" component="span" fullWidth>
-                    Select image
-                  </Button>
-                </label>
-                {form.image && (
-                  <Box sx={{ mt: 2, textAlign: 'center' }}>
-                    <img 
-                      src={form.image} 
-                      alt="Preview" 
-                      style={{ 
-                        maxWidth: '100%', 
-                        maxHeight: '200px',
-                        borderRadius: '4px',
-                        border: '1px solid #ddd'
-                      }} 
-                    />
-                  </Box>
-                )}
-              </Box>
+              </Button>
+            </Grid>
+          </Grid>
+        </Box>
 
-              {/* Seasonality section */}
-              <Box sx={{ mt: 3, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      name="isSeasonal"
-                      checked={form.isSeasonal}
-                      onChange={handleSwitchChange}
-                      color="primary"
-                    />
+        {/* Saisonnalité */}
+        <Box sx={{ mt: 2, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                name="isSeasonal"
+                checked={form.isSeasonal}
+                onChange={handleSwitchChange}
+                color="primary"
+              />
+            }
+            label="Produit saisonnier"
+          />
+
+          <Collapse in={form.isSeasonal}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <DatePicker
+                label="Début de saison"
+                value={form.seasonStart}
+                onChange={(date) => setForm(prev => ({ ...prev, seasonStart: date }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.seasonStart,
+                    helperText: errors.seasonStart,
+                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
                   }
-                  label="Seasonal product"
-                />
-
-                <Collapse in={form.isSeasonal}>
-                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
-                    <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                      <DatePicker
-                        label="Season start"
-                        value={form.seasonStart}
-                        onChange={(date) => setForm(prev => ({ ...prev, seasonStart: date }))}
-                        slotProps={{
-                          textField: {
-                            fullWidth: true,
-                            error: !!errors.seasonStart,
-                            helperText: errors.seasonStart
-                          }
-                        }}
-                      />
-                      <DatePicker
-                        label="Season end"
-                        value={form.seasonEnd}
-                        onChange={(date) => setForm(prev => ({ ...prev, seasonEnd: date }))}
-                        minDate={form.seasonStart}
-                        slotProps={{
-                          textField: {
-                            fullWidth: true,
-                            error: !!errors.seasonEnd,
-                            helperText: errors.seasonEnd
-                          }
-                        }}
-                      />
-                    </Box>
-                  </LocalizationProvider>
-                </Collapse>
-              </Box>
-
-              {/* Promotion section */}
-              <Box sx={{ mt: 3, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
-                <FormControlLabel
-                  control={
-                    <Switch
-                      name="hasPromotion"
-                      checked={form.hasPromotion}
-                      onChange={handleSwitchChange}
-                      color="secondary"
-                    />
+                }}
+              />
+              <DatePicker
+                label="Fin de saison"
+                value={form.seasonEnd}
+                onChange={(date) => setForm(prev => ({ ...prev, seasonEnd: date }))}
+                minDate={form.seasonStart}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.seasonEnd,
+                    helperText: errors.seasonEnd
                   }
-                  label="Promotion"
+                }}
+              />
+            </Box>
+          </Collapse>
+        </Box>
+
+        {/* Promotion */}
+        <Box sx={{ mt: 2, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
+          <FormControlLabel
+            control={
+              <Switch
+                name="hasPromotion"
+                checked={form.hasPromotion}
+                onChange={handleSwitchChange}
+                color="primary"
+              />
+            }
+            label="Promotion"
+          />
+
+          <Collapse in={form.hasPromotion}>
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <TextField
+                select
+                fullWidth
+                label="Type de promotion"
+                name="promotionType"
+                value={form.promotionType}
+                onChange={handleInputChange}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+              >
+                <MenuItem value="percentage">Pourcentage (%)</MenuItem>
+                <MenuItem value="fixed">Montant fixe (GNF)</MenuItem>
+              </TextField>
+              <TextField
+                fullWidth
+                label={form.promotionType === 'percentage' ? 'Pourcentage' : 'Montant'}
+                name="promotionValue"
+                type="number"
+                value={form.promotionValue}
+                onChange={handleInputChange}
+                error={!!errors.promotionValue}
+                helperText={errors.promotionValue}
+                size="small"
+                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
+                InputProps={form.promotionType === 'fixed' ? {
+                  startAdornment: <InputAdornment position="start">GNF</InputAdornment>
+                } : undefined}
+              />
+            </Box>
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <DatePicker
+                label="Début de promotion"
+                value={form.promotionStart}
+                onChange={(date) => setForm(prev => ({ ...prev, promotionStart: date }))}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.promotionStart,
+                    helperText: errors.promotionStart,
+                    size: "small",
+                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
+                  }
+                }}
+              />
+              <DatePicker
+                label="Fin de promotion"
+                value={form.promotionEnd}
+                onChange={(date) => setForm(prev => ({ ...prev, promotionEnd: date }))}
+                minDate={form.promotionStart}
+                slotProps={{
+                  textField: {
+                    fullWidth: true,
+                    error: !!errors.promotionEnd,
+                    helperText: errors.promotionEnd,
+                    size: "small",
+                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
+                  }
+                }}
+              />
+            </Box>
+          </Collapse>
+        </Box>
+      </Box>
+    );
+  };
+
+  return (
+    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
+      <Box sx={{ p: 3 }}>
+        <Typography variant="h5" gutterBottom>Produits</Typography>
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+          <Button
+            variant="contained"
+            onClick={() => handleOpenDialog()}
+            startIcon={<AddIcon />}
+          >
+            Nouveau produit
+          </Button>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filters.seasonalOnly}
+                  onChange={(e) => handleFilterChange('seasonalOnly', e.target.checked)}
                 />
+              }
+              label="Produits saisonniers"
+            />
+            <FormControlLabel
+              control={
+                <Switch
+                  checked={filters.promotionsOnly}
+                  onChange={(e) => handleFilterChange('promotionsOnly', e.target.checked)}
+                />
+              }
+              label="Produits en promotion"
+            />
+          </Box>
+        </Box>
 
-                <Collapse in={form.hasPromotion}>
-                  <Box sx={{ mt: 2 }}>
-                    <FormControl component="fieldset">
-                      <FormLabel component="legend">Promotion type</FormLabel>
-                      <RadioGroup
-                        row
-                        name="promotionType"
-                        value={form.promotionType}
-                        onChange={handleInputChange}
-                      >
-                        <FormControlLabel value="percentage" control={<Radio />} label="Percentage" />
-                        <FormControlLabel value="fixed" control={<Radio />} label="Fixed amount" />
-                      </RadioGroup>
-                    </FormControl>
-
-                    <TextField
-                      fullWidth
-                      margin="normal"
-                      name="promotionValue"
-                      label={`Promotion value (${form.promotionType === 'percentage' ? '%' : 'GNF'})`}
-                      type="number"
-                      value={form.promotionValue}
-                      onChange={handleInputChange}
-                      error={!!errors.promotionValue}
-                      helperText={errors.promotionValue}
-                      inputProps={{ 
-                        min: "0",
-                        max: form.promotionType === 'percentage' ? "100" : undefined
-                      }}
-                    />
-
-                    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
-                      <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-                        <DatePicker
-                          label="Promotion start"
-                          value={form.promotionStart}
-                          onChange={(date) => setForm(prev => ({ ...prev, promotionStart: date }))}
-                          slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              error: !!errors.promotionStart,
-                              helperText: errors.promotionStart
-                            }
-                          }}
-                        />
-                        <DatePicker
-                          label="Promotion end"
-                          value={form.promotionEnd}
-                          onChange={(date) => setForm(prev => ({ ...prev, promotionEnd: date }))}
-                          minDate={form.promotionStart}
-                          slotProps={{
-                            textField: {
-                              fullWidth: true,
-                              error: !!errors.promotionEnd,
-                              helperText: errors.promotionEnd
-                            }
-                          }}
+        {/* Table des produits */}
+        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 3 }}>
+          <TableContainer component={Paper}>
+            <Table stickyHeader>
+              <TableHead>
+                <TableRow>
+                  <TableCell>Nom</TableCell>
+                  <TableCell>Catégorie</TableCell>
+                  <TableCell>Prix</TableCell>
+                  <TableCell>Stock</TableCell>
+                  <TableCell>Actions</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {getFilteredProducts().map((product) => (
+                  <TableRow key={product._id}>
+                    <TableCell>{product.name}</TableCell>
+                    <TableCell>{product.category}</TableCell>
+                    <TableCell>{formatPrice(product.price)}</TableCell>
+                    <TableCell>
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        <Typography>{product.quantity}</Typography>
+                        <Chip
+                          size="small"
+                          color={getStockStatus(product.quantity, product.alertThreshold)}
+                          label={product.quantity <= product.alertThreshold ? 'Alerte' : 'OK'}
                         />
                       </Box>
-                    </LocalizationProvider>
-                  </Box>
-                </Collapse>
-              </Box>
-            </Box>
-          )}
-        </DialogContent>
-        <DialogActions sx={{ p: 2 }}>
-          <Button onClick={handleCloseDialog} color="inherit">
-            Cancel
-          </Button>
-          <Button type="submit" variant="contained" disabled={isLoading}>
-            {isLoading ? <CircularProgress size={24} color="inherit" /> : selectedProduct ? 'Update' : 'Add'}
-          </Button>
-        </DialogActions>
-      </Dialog>
-      
-      {/* Notification */}
-      <Snackbar
-        open={notification.open}
-        autoHideDuration={6000}
-        onClose={closeNotification}
-        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      >
-        <Alert onClose={closeNotification} severity={notification.severity}>
-          {notification.message}
-        </Alert>
-      </Snackbar>
-    </Box>
+                    </TableCell>
+                    <TableCell>
+                      <ButtonGroup>
+                        <Button startIcon={<EditIcon />} onClick={() => handleOpenDialog(product)}>Modifier</Button>
+                        <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteProduct(product._id)}>Supprimer</Button>
+                      </ButtonGroup>
+                    </TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </TableContainer>
+        </Paper>
+
+        {/* Pagination */}
+        <TablePagination
+          component="div"
+          count={getFilteredProducts().length}
+          page={page}
+          onPageChange={(e, newPage) => setPage(newPage)}
+          rowsPerPage={ITEMS_PER_PAGE}
+          rowsPerPageOptions={[ITEMS_PER_PAGE]}
+        />
+
+        {/* Dialog de modification */}
+        <Dialog
+          open={dialog.open}
+          onClose={handleCloseDialog}
+          maxWidth="md"
+          fullWidth
+        >
+          <DialogTitle>{selectedProduct ? 'Modifier produit' : 'Nouveau produit'}</DialogTitle>
+          <DialogContent>
+            {renderFormContent()}
+          </DialogContent>
+          <DialogActions>
+            <Button onClick={handleCloseDialog}>Annuler</Button>
+            <Button onClick={handleSubmit} variant="contained" color="primary">
+              {selectedProduct ? 'Modifier' : 'Créer'}
+            </Button>
+          </DialogActions>
+        </Dialog>
+
+        {/* Notification */}
+        <Snackbar
+          open={notification.open}
+          autoHideDuration={6000}
+          onClose={closeNotification}
+          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+        >
+          <Alert
+            onClose={closeNotification}
+            severity={notification.severity}
+            sx={{ width: '100%' }}
+          >
+            {notification.message}
+          </Alert>
+        </Snackbar>
+      </Box>
+    </LocalizationProvider>
   );
 };
 
