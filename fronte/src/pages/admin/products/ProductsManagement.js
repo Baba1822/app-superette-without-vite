@@ -57,15 +57,6 @@ import { toast } from 'react-toastify';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 
-const endpoints = {
-  products: {
-    list: `${API_BASE_URL}/products`,
-    create: `${API_BASE_URL}/products`,
-    update: (id) => `${API_BASE_URL}/products/${id}`,
-    delete: (id) => `${API_BASE_URL}/products/${id}`,
-  }
-};
-
 const ITEMS_PER_PAGE = 10;
 
 const ProductsManagement = () => {
@@ -81,33 +72,29 @@ const ProductsManagement = () => {
     item: null,
   });
 
-  const [form, setForm] = useState({
-    name: '',
-    category: '',
-    price: '',
-    quantity: '',
+  const initialFormState = {
+    nom: '',
+    categorie_id: '',
+    prix: '',
+    stock: '',
     description: '',
-    alertThreshold: '5',
+    stock_min: '5',
     image: '',
-    isSeasonal: false,
-    seasonStart: null,
-    seasonEnd: null,
-    hasPromotion: false,
-    promotionType: 'percentage',
-    promotionValue: '',
-    promotionStart: null,
-    promotionEnd: null,
-    datePeremption: null,
-  });
+    saison: false,
+    date_debut_saison: null,
+    date_fin_saison: null,
+    promotion: false,
+    type_promotion: 'percentage',
+    valeur_promotion: '',
+    date_debut_promo: null,
+    date_fin_promo: null,
+    date_peremption: null,
+  };
 
+  const [form, setForm] = useState(initialFormState);
   const [errors, setErrors] = useState({});
-  const [notification, setNotification] = useState({
-    open: false,
-    message: '',
-    severity: 'success'
-  });
-
   const [page, setPage] = useState(0);
+  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
 
@@ -117,24 +104,16 @@ const ProductsManagement = () => {
     queryFn: productService.getAllProducts
   });
 
-  // Logs pour déboguer
-  useEffect(() => {
-    console.log('Products data:', products);
-    console.log('Loading state:', isLoading);
-    console.log('Error:', error);
-  }, [products, isLoading, error]);
-
   // Mutations for CRUD operations
   const createMutation = useMutation({
-    mutationFn: productService.createProduct,
+    mutationFn: (productData) => productService.createProduct(productData),
     onSuccess: () => {
       queryClient.invalidateQueries(['products']);
       handleCloseDialog();
       toast.success('Produit ajouté avec succès');
     },
     onError: (error) => {
-      setErrors(prev => ({ ...prev, error: error.response?.data?.message || 'Erreur lors de l\'ajout du produit' }));
-      toast.error('Erreur lors de l\'ajout du produit');
+      toast.error(error.response?.data?.message || 'Erreur lors de l\'ajout du produit');
     }
   });
 
@@ -146,13 +125,12 @@ const ProductsManagement = () => {
       toast.success('Produit mis à jour avec succès');
     },
     onError: (error) => {
-      setErrors(prev => ({ ...prev, error: error.response?.data?.message || 'Erreur lors de la mise à jour' }));
-      toast.error('Erreur lors de la mise à jour');
+      toast.error(error.response?.data?.message || 'Erreur lors de la mise à jour');
     }
   });
 
   const deleteMutation = useMutation({
-    mutationFn: productService.deleteProduct,
+    mutationFn: (id) => productService.deleteProduct(id),
     onSuccess: () => {
       queryClient.invalidateQueries(['products']);
       toast.success('Produit supprimé avec succès');
@@ -162,119 +140,95 @@ const ProductsManagement = () => {
     }
   });
 
-  const uploadImageMutation = useMutation({
-    mutationFn: ({ id, file }) => productService.uploadImage(id, file),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['products']);
-      toast.success('Image téléchargée avec succès');
-    },
-    onError: () => {
-      toast.error('Erreur lors du téléchargement de l\'image');
-    }
-  });
-
-  // Handle filters
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({ ...prev, [name]: value }));
   };
 
-  // Handle dialog
   const handleOpenDialog = (item = null) => {
-    setForm({
-      name: item?.name || '',
-      category: item?.category || '',
-      price: item?.price?.toString() || '',
-      quantity: item?.quantity?.toString() || '',
-      description: item?.description || '',
-      alertThreshold: item?.alertThreshold?.toString() || '5',
-      image: item?.image || '',
-      isSeasonal: item?.isSeasonal || false,
-      seasonStart: item?.seasonStart ? new Date(item.seasonStart) : null,
-      seasonEnd: item?.seasonEnd ? new Date(item.seasonEnd) : null,
-      hasPromotion: item?.hasPromotion || false,
-      promotionType: item?.promotionType || 'percentage',
-      promotionValue: item?.promotionValue?.toString() || '',
-      promotionStart: item?.promotionStart ? new Date(item.promotionStart) : null,
-      promotionEnd: item?.promotionEnd ? new Date(item.promotionEnd) : null,
-      datePeremption: item?.datePeremption ? new Date(item.datePeremption) : null,
-    });
-    
+    if (item) {
+      setForm({
+        nom: item.nom || '',
+        categorie_id: item.categorie_id || '',
+        prix: item.prix?.toString() || '',
+        stock: item.stock?.toString() || '',
+        description: item.description || '',
+        stock_min: item.stock_min?.toString() || '5',
+        image: item.image || '',
+        saison: item.saison || false,
+        date_debut_saison: item.date_debut_saison ? new Date(item.date_debut_saison) : null,
+        date_fin_saison: item.date_fin_saison ? new Date(item.date_fin_saison) : null,
+        promotion: item.promotion || false,
+        type_promotion: item.type_promotion || 'percentage',
+        valeur_promotion: item.valeur_promotion?.toString() || '',
+        date_debut_promo: item.date_debut_promo ? new Date(item.date_debut_promo) : null,
+        date_fin_promo: item.date_fin_promo ? new Date(item.date_fin_promo) : null,
+        date_peremption: item.date_peremption ? new Date(item.date_peremption) : null,
+      });
+      setSelectedProduct(item);
+    } else {
+      setForm(initialFormState);
+      setSelectedProduct(null);
+    }
     setDialog({ open: true, item });
     setErrors({});
-    setSelectedProduct(item);
     setImageFile(null);
   };
 
   const handleCloseDialog = () => {
-    setForm({
-      name: '',
-      category: '',
-      price: '',
-      quantity: '',
-      description: '',
-      alertThreshold: '5',
-      image: '',
-      isSeasonal: false,
-      seasonStart: null,
-      seasonEnd: null,
-      hasPromotion: false,
-      promotionType: 'percentage',
-      promotionValue: '',
-      promotionStart: null,
-      promotionEnd: null,
-      datePeremption: null,
-    });
     setDialog({ open: false, item: null });
+    setForm(initialFormState);
     setSelectedProduct(null);
     setImageFile(null);
     setErrors({});
   };
 
-  // Handle form changes
   const handleInputChange = (e) => {
     const { name, value } = e.target;
     setForm(prev => ({ ...prev, [name]: value }));
   };
 
   const handleSwitchChange = (e) => {
-    const { name } = e.target;
-    setForm(prev => ({ ...prev, [name]: !prev[name] }));
+    const { name, checked } = e.target;
+    setForm(prev => ({ ...prev, [name]: checked }));
   };
 
   const handleImageChange = (e) => {
     const file = e.target.files[0];
     if (file) {
       setImageFile(file);
-      setForm(prev => ({ ...prev, image: URL.createObjectURL(file) }));
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        setForm(prev => ({ ...prev, image: event.target.result }));
+      };
+      reader.readAsDataURL(file);
     }
   };
 
-  // Form validation
   const validateForm = () => {
     const newErrors = {};
     
-    if (!form.name.trim()) newErrors.name = 'Le nom est requis';
-    if (!form.category) newErrors.category = 'La catégorie est requise';
-    if (!form.price) newErrors.price = 'Le prix est requis';
-    if (!form.quantity) newErrors.quantity = 'Le stock est requis';
-    if (!form.alertThreshold) newErrors.alertThreshold = 'Le seuil d\'alerte est requis';
+    if (!form.nom.trim()) newErrors.nom = 'Le nom est requis';
+    if (!form.categorie_id) newErrors.categorie_id = 'La catégorie est requise';
+    if (!form.prix || isNaN(form.prix)) newErrors.prix = 'Prix invalide';
+    if (!form.stock || isNaN(form.stock)) newErrors.stock = 'Stock invalide';
+    if (!form.stock_min || isNaN(form.stock_min)) newErrors.stock_min = 'Seuil d\'alerte invalide';
     
-    if (form.isSeasonal) {
-      if (!form.seasonStart) newErrors.seasonStart = 'La date de début est requise';
-      if (!form.seasonEnd) newErrors.seasonEnd = 'La date de fin est requise';
+    if (form.saison) {
+      if (!form.date_debut_saison) newErrors.date_debut_saison = 'Date de début requise';
+      if (!form.date_fin_saison) newErrors.date_fin_saison = 'Date de fin requise';
+      if (form.date_debut_saison && form.date_fin_saison && form.date_debut_saison > form.date_fin_saison) {
+        newErrors.date_fin_saison = 'La date de fin doit être après la date de début';
+      }
     }
 
-    if (form.hasPromotion) {
-      if (!form.promotionType) newErrors.promotionType = 'Le type de promotion est requis';
-      if (!form.promotionValue) newErrors.promotionValue = 'La valeur de promotion est requise';
-      if (!form.promotionStart) newErrors.promotionStart = 'La date de début est requise';
-      if (!form.promotionEnd) newErrors.promotionEnd = 'La date de fin est requise';
-      
-      if (form.promotionType === 'percentage' && form.promotionValue) {
-        const value = parseFloat(form.promotionValue);
-        if (value <= 0 || value > 100) {
-          newErrors.promotionValue = 'Le pourcentage doit être entre 1 et 100';
-        }
+    if (form.promotion) {
+      if (!form.valeur_promotion || isNaN(form.valeur_promotion)) {
+        newErrors.valeur_promotion = 'Valeur de promotion invalide';
+      }
+      if (!form.date_debut_promo) newErrors.date_debut_promo = 'Date de début requise';
+      if (!form.date_fin_promo) newErrors.date_fin_promo = 'Date de fin requise';
+      if (form.date_debut_promo && form.date_fin_promo && form.date_debut_promo > form.date_fin_promo) {
+        newErrors.date_fin_promo = 'La date de fin doit être après la date de début';
       }
     }
     
@@ -282,48 +236,44 @@ const ProductsManagement = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  // Form submission
-  const handleSubmit = (e) => {
+  const handleSubmit = async (e) => {
     e.preventDefault();
     if (!validateForm()) return;
 
-    const formData = {
+    const productData = {
       ...form,
-      price: parseFloat(form.price),
-      quantity: parseInt(form.quantity),
-      alertThreshold: parseInt(form.alertThreshold),
-      promotionValue: form.promotionValue ? parseFloat(form.promotionValue) : null,
-      seasonStart: form.seasonStart?.toISOString(),
-      seasonEnd: form.seasonEnd?.toISOString(),
-      promotionStart: form.promotionStart?.toISOString(),
-      promotionEnd: form.promotionEnd?.toISOString(),
-      datePeremption: form.datePeremption?.toISOString(),
+      prix: parseFloat(form.prix),
+      stock: parseInt(form.stock),
+      stock_min: parseInt(form.stock_min),
+      valeur_promotion: form.promotion ? parseFloat(form.valeur_promotion) : null,
+      date_debut_saison: form.saison ? form.date_debut_saison : null,
+      date_fin_saison: form.saison ? form.date_fin_saison : null,
+      date_debut_promo: form.promotion ? form.date_debut_promo : null,
+      date_fin_promo: form.promotion ? form.date_fin_promo : null,
+      date_peremption: form.date_peremption,
     };
 
-    if (selectedProduct) {
-      updateMutation.mutate(formData);
-    } else {
-      createMutation.mutate(formData);
+    try {
+      if (selectedProduct) {
+        await updateMutation.mutateAsync(productData);
+      } else {
+        await createMutation.mutateAsync(productData);
+      }
+
+      if (imageFile) {
+        await productService.uploadImage(selectedProduct ? selectedProduct.id : createMutation.data.id, imageFile);
+      }
+    } catch (error) {
+      console.error('Error submitting form:', error);
     }
   };
 
-  // Delete product
   const deleteProduct = (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
       deleteMutation.mutate(id);
     }
   };
 
-  // Notifications
-  const showNotification = (message, severity = 'success') => {
-    setNotification({ open: true, message, severity });
-  };
-
-  const closeNotification = () => {
-    setNotification({ open: false, message: '', severity: 'success' });
-  };
-
-  // Utility functions
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
@@ -332,330 +282,318 @@ const ProductsManagement = () => {
   };
 
   const getStockStatus = (quantity, alertThreshold) => {
-    if (!quantity) return 'error';
+    if (quantity <= 0) return 'error';
     if (quantity <= alertThreshold) return 'warning';
     return 'success';
   };
 
-  // Filtrer les produits
   const getFilteredProducts = () => {
     if (!Array.isArray(products)) return [];
-    const { seasonalOnly, promotionsOnly } = filters;
     return products.filter(product => {
-      if (seasonalOnly && !product.isSeasonal) return false;
-      if (promotionsOnly && !product.hasPromotion) return false;
+      if (filters.seasonalOnly && !product.saison) return false;
+      if (filters.promotionsOnly && !product.promotion) return false;
       return true;
     });
   };
 
-  // Render form content
-  const renderFormContent = () => {
-    return (
-      <Box sx={{ display: 'grid', gap: 1, mt: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
+  const renderFormContent = () => (
+    <Box sx={{ mt: 2 }}>
+      <Grid container spacing={2}>
         {/* Informations de base */}
-        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
-          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Informations de base</Typography>
-          <Grid container spacing={0.5}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Nom"
-                name="name"
-                value={form.name}
-                onChange={handleInputChange}
-                error={!!errors.name}
-                helperText={errors.name}
-                required
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Catégorie"
-                name="category"
-                value={form.category}
-                onChange={handleInputChange}
-                error={!!errors.category}
-                helperText={errors.category}
-                required
-                select
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              >
-                <MenuItem value="">Sélectionner une catégorie</MenuItem>
-                <MenuItem value="1">Produits frais</MenuItem>
-                <MenuItem value="2">Produits secs</MenuItem>
-                <MenuItem value="3">Boissons</MenuItem>
-              </TextField>
-            </Grid>
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Description"
-                name="description"
-                value={form.description}
-                onChange={handleInputChange}
-                error={!!errors.description}
-                helperText={errors.description}
-                multiline
-                rows={2}
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-          </Grid>
-        </Box>
+        <Grid item xs={12} md={6}>
+          <Typography variant="h6" gutterBottom>Informations de base</Typography>
+          
+          <TextField
+            fullWidth
+            label="Nom du produit"
+            name="nom"
+            value={form.nom}
+            onChange={handleInputChange}
+            error={!!errors.nom}
+            helperText={errors.nom}
+            margin="normal"
+            required
+          />
+          
+          <TextField
+            fullWidth
+            label="Catégorie"
+            name="categorie_id"
+            value={form.categorie_id}
+            onChange={handleInputChange}
+            error={!!errors.categorie_id}
+            helperText={errors.categorie_id}
+            margin="normal"
+            required
+            select
+          >
+            <MenuItem value="1">Fruits et Légumes</MenuItem>
+            <MenuItem value="2">Produits Laitiers</MenuItem>
+            <MenuItem value="3">Viandes</MenuItem>
+            <MenuItem value="4">Boissons</MenuItem>
+          </TextField>
+          
+          <TextField
+            fullWidth
+            label="Description"
+            name="description"
+            value={form.description}
+            onChange={handleInputChange}
+            margin="normal"
+            multiline
+            rows={3}
+          />
+        </Grid>
 
         {/* Prix et Stock */}
-        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
-          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Prix et Stock</Typography>
-          <Grid container spacing={0.5}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Prix"
-                name="price"
-                type="number"
-                value={form.price}
-                onChange={handleInputChange}
-                error={!!errors.price}
-                helperText={errors.price}
-                required
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-                InputProps={{
-                  startAdornment: <InputAdornment position="start">GNF</InputAdornment>,
-                  sx: { fontSize: '0.8rem' }
-                }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Stock"
-                name="quantity"
-                type="number"
-                value={form.quantity}
-                onChange={handleInputChange}
-                error={!!errors.quantity}
-                helperText={errors.quantity}
-                required
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Seuil d'alerte"
-                name="alertThreshold"
-                type="number"
-                value={form.alertThreshold}
-                onChange={handleInputChange}
-                error={!!errors.alertThreshold}
-                helperText={errors.alertThreshold}
-                required
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-          </Grid>
-        </Box>
-
-        {/* Date et Image */}
-        <Box sx={{ display: 'grid', gap: 0.5, mb: 1, p: 1, bgcolor: 'background.paper', borderRadius: 1 }}>
-          <Typography variant="body2" color="primary" sx={{ fontSize: '0.9rem' }}>Date et Image</Typography>
-          <Grid container spacing={0.5}>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Date de péremption"
-                name="datePeremption"
-                type="date"
-                value={form.datePeremption ? form.datePeremption.toISOString().split('T')[0] : ''}
-                onChange={(e) => setForm(prev => ({ ...prev, datePeremption: e.target.value ? new Date(e.target.value) : null }))}
-                error={!!errors.datePeremption}
-                helperText={errors.datePeremption}
-                InputLabelProps={{ shrink: true }}
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-            <Grid item xs={12} sm={6}>
-              <TextField
-                fullWidth
-                label="Image URL"
-                name="image"
-                value={form.image}
-                onChange={handleInputChange}
-                error={!!errors.image}
-                helperText={errors.image}
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              />
-            </Grid>
-            <Grid item xs={12}>
-              <Button
-                variant="contained"
-                component="label"
-                fullWidth
-                size="small"
-                sx={{ fontSize: '0.8rem', height: '2.5rem' }}
-              >
-                Upload Image
-                <input
-                  type="file"
-                  hidden
-                  accept="image/*"
-                  onChange={handleImageChange}
+        <Grid item xs={12} md={6}>
+          <Typography variant="h6" gutterBottom>Prix et Stock</Typography>
+          
+          <TextField
+            fullWidth
+            label="Prix (€)"
+            name="prix"
+            type="number"
+            value={form.prix}
+            onChange={handleInputChange}
+            error={!!errors.prix}
+            helperText={errors.prix}
+            margin="normal"
+            required
+            InputProps={{
+              inputProps: { min: 0, step: 0.01 }
+            }}
+          />
+          
+          <TextField
+            fullWidth
+            label="Stock"
+            name="stock"
+            type="number"
+            value={form.stock}
+            onChange={handleInputChange}
+            error={!!errors.stock}
+            helperText={errors.stock}
+            margin="normal"
+            required
+            InputProps={{
+              inputProps: { min: 0 }
+            }}
+          />
+          
+          <TextField
+            fullWidth
+            label="Seuil d'alerte"
+            name="stock_min"
+            type="number"
+            value={form.stock_min}
+            onChange={handleInputChange}
+            error={!!errors.stock_min}
+            helperText={errors.stock_min}
+            margin="normal"
+            required
+            InputProps={{
+              inputProps: { min: 0 }
+            }}
+          />
+          
+          <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
+            <DatePicker
+              label="Date de péremption"
+              value={form.date_peremption}
+              onChange={(date) => setForm(prev => ({ ...prev, date_peremption: date }))}
+              renderInput={(params) => (
+                <TextField
+                  {...params}
+                  fullWidth
+                  margin="normal"
                 />
-              </Button>
-            </Grid>
-          </Grid>
-        </Box>
+              )}
+            />
+          </LocalizationProvider>
+        </Grid>
+
+        {/* Image */}
+        <Grid item xs={12}>
+          <Typography variant="h6" gutterBottom>Image</Typography>
+          <input
+            accept="image/*"
+            type="file"
+            onChange={handleImageChange}
+            id="product-image-upload"
+            hidden
+          />
+          <label htmlFor="product-image-upload">
+            <Button variant="contained" component="span" startIcon={<ImageIcon />}>
+              Uploader une image
+            </Button>
+          </label>
+          {form.image && (
+            <Box mt={2}>
+              <img 
+                src={form.image} 
+                alt="Preview" 
+                style={{ maxWidth: '200px', maxHeight: '200px' }} 
+              />
+            </Box>
+          )}
+        </Grid>
 
         {/* Saisonnalité */}
-        <Box sx={{ mt: 2, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
+        <Grid item xs={12}>
           <FormControlLabel
             control={
               <Switch
-                name="isSeasonal"
-                checked={form.isSeasonal}
+                name="saison"
+                checked={form.saison}
                 onChange={handleSwitchChange}
                 color="primary"
               />
             }
             label="Produit saisonnier"
           />
-
-          <Collapse in={form.isSeasonal}>
-            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-              <DatePicker
-                label="Début de saison"
-                value={form.seasonStart}
-                onChange={(date) => setForm(prev => ({ ...prev, seasonStart: date }))}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.seasonStart,
-                    helperText: errors.seasonStart,
-                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
-                  }
-                }}
-              />
-              <DatePicker
-                label="Fin de saison"
-                value={form.seasonEnd}
-                onChange={(date) => setForm(prev => ({ ...prev, seasonEnd: date }))}
-                minDate={form.seasonStart}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.seasonEnd,
-                    helperText: errors.seasonEnd
-                  }
-                }}
-              />
+          
+          <Collapse in={form.saison}>
+            <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
+              <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
+                <DatePicker
+                  label="Début de saison"
+                  value={form.date_debut_saison}
+                  onChange={(date) => setForm(prev => ({ ...prev, date_debut_saison: date }))}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      error={!!errors.date_debut_saison}
+                      helperText={errors.date_debut_saison}
+                    />
+                  )}
+                />
+                <DatePicker
+                  label="Fin de saison"
+                  value={form.date_fin_saison}
+                  onChange={(date) => setForm(prev => ({ ...prev, date_fin_saison: date }))}
+                  renderInput={(params) => (
+                    <TextField
+                      {...params}
+                      fullWidth
+                      error={!!errors.date_fin_saison}
+                      helperText={errors.date_fin_saison}
+                    />
+                  )}
+                />
+              </LocalizationProvider>
             </Box>
           </Collapse>
-        </Box>
+        </Grid>
 
         {/* Promotion */}
-        <Box sx={{ mt: 2, border: '1px solid #eee', borderRadius: 1, p: 2 }}>
+        <Grid item xs={12}>
           <FormControlLabel
             control={
               <Switch
-                name="hasPromotion"
-                checked={form.hasPromotion}
+                name="promotion"
+                checked={form.promotion}
                 onChange={handleSwitchChange}
                 color="primary"
               />
             }
             label="Promotion"
           />
-
-          <Collapse in={form.hasPromotion}>
-            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-              <TextField
-                select
-                fullWidth
-                label="Type de promotion"
-                name="promotionType"
-                value={form.promotionType}
-                onChange={handleInputChange}
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-              >
-                <MenuItem value="percentage">Pourcentage (%)</MenuItem>
-                <MenuItem value="fixed">Montant fixe (GNF)</MenuItem>
-              </TextField>
-              <TextField
-                fullWidth
-                label={form.promotionType === 'percentage' ? 'Pourcentage' : 'Montant'}
-                name="promotionValue"
-                type="number"
-                value={form.promotionValue}
-                onChange={handleInputChange}
-                error={!!errors.promotionValue}
-                helperText={errors.promotionValue}
-                size="small"
-                sx={{ '& .MuiInputLabel-root': { fontSize: '0.8rem' } }}
-                InputProps={form.promotionType === 'fixed' ? {
-                  startAdornment: <InputAdornment position="start">GNF</InputAdornment>
-                } : undefined}
-              />
-            </Box>
-            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
-              <DatePicker
-                label="Début de promotion"
-                value={form.promotionStart}
-                onChange={(date) => setForm(prev => ({ ...prev, promotionStart: date }))}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.promotionStart,
-                    helperText: errors.promotionStart,
-                    size: "small",
-                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
-                  }
-                }}
-              />
-              <DatePicker
-                label="Fin de promotion"
-                value={form.promotionEnd}
-                onChange={(date) => setForm(prev => ({ ...prev, promotionEnd: date }))}
-                minDate={form.promotionStart}
-                slotProps={{
-                  textField: {
-                    fullWidth: true,
-                    error: !!errors.promotionEnd,
-                    helperText: errors.promotionEnd,
-                    size: "small",
-                    sx: { '& .MuiInputLabel-root': { fontSize: '0.8rem' } }
-                  }
-                }}
-              />
+          
+          <Collapse in={form.promotion}>
+            <Box sx={{ mt: 2 }}>
+              <Grid container spacing={2}>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    select
+                    fullWidth
+                    label="Type de promotion"
+                    name="type_promotion"
+                    value={form.type_promotion}
+                    onChange={handleInputChange}
+                    error={!!errors.type_promotion}
+                    helperText={errors.type_promotion}
+                  >
+                    <MenuItem value="percentage">Pourcentage</MenuItem>
+                    <MenuItem value="fixed">Montant fixe</MenuItem>
+                  </TextField>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <TextField
+                    fullWidth
+                    label={`Valeur (${form.type_promotion === 'percentage' ? '%' : '€'})`}
+                    name="valeur_promotion"
+                    type="number"
+                    value={form.valeur_promotion}
+                    onChange={handleInputChange}
+                    error={!!errors.valeur_promotion}
+                    helperText={errors.valeur_promotion}
+                    InputProps={{
+                      inputProps: { 
+                        min: 0,
+                        max: form.type_promotion === 'percentage' ? 100 : undefined
+                      }
+                    }}
+                  />
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
+                    <DatePicker
+                      label="Début de promotion"
+                      value={form.date_debut_promo}
+                      onChange={(date) => setForm(prev => ({ ...prev, date_debut_promo: date }))}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          error={!!errors.date_debut_promo}
+                          helperText={errors.date_debut_promo}
+                        />
+                      )}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+                <Grid item xs={12} sm={6}>
+                  <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
+                    <DatePicker
+                      label="Fin de promotion"
+                      value={form.date_fin_promo}
+                      onChange={(date) => setForm(prev => ({ ...prev, date_fin_promo: date }))}
+                      renderInput={(params) => (
+                        <TextField
+                          {...params}
+                          fullWidth
+                          error={!!errors.date_fin_promo}
+                          helperText={errors.date_fin_promo}
+                        />
+                      )}
+                    />
+                  </LocalizationProvider>
+                </Grid>
+              </Grid>
             </Box>
           </Collapse>
-        </Box>
-      </Box>
-    );
-  };
+        </Grid>
+      </Grid>
+    </Box>
+  );
 
   return (
     <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
       <Box sx={{ p: 3 }}>
-        <Typography variant="h5" gutterBottom>Produits</Typography>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" gutterBottom>Gestion des Produits</Typography>
+        
+        <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
           <Button
             variant="contained"
-            onClick={() => handleOpenDialog()}
+            color="primary"
             startIcon={<AddIcon />}
+            onClick={() => handleOpenDialog()}
           >
-            Nouveau produit
+            Ajouter un produit
           </Button>
+          
           <Box sx={{ display: 'flex', gap: 2 }}>
             <FormControlLabel
               control={
@@ -664,7 +602,7 @@ const ProductsManagement = () => {
                   onChange={(e) => handleFilterChange('seasonalOnly', e.target.checked)}
                 />
               }
-              label="Produits saisonniers"
+              label="Saisonniers seulement"
             />
             <FormControlLabel
               control={
@@ -673,15 +611,14 @@ const ProductsManagement = () => {
                   onChange={(e) => handleFilterChange('promotionsOnly', e.target.checked)}
                 />
               }
-              label="Produits en promotion"
+              label="Promotions seulement"
             />
           </Box>
         </Box>
 
-        {/* Table des produits */}
-        <Paper sx={{ width: '100%', overflow: 'hidden', mt: 3 }}>
-          <TableContainer component={Paper}>
-            <Table stickyHeader>
+        <Paper sx={{ width: '100%', mb: 2 }}>
+          <TableContainer>
+            <Table>
               <TableHead>
                 <TableRow>
                   <TableCell>Nom</TableCell>
@@ -692,78 +629,103 @@ const ProductsManagement = () => {
                 </TableRow>
               </TableHead>
               <TableBody>
-                {getFilteredProducts().map((product) => (
-                  <TableRow key={product._id}>
-                    <TableCell>{product.name}</TableCell>
-                    <TableCell>{product.category}</TableCell>
-                    <TableCell>{formatPrice(product.price)}</TableCell>
-                    <TableCell>
-                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <Typography>{product.quantity}</Typography>
-                        <Chip
-                          size="small"
-                          color={getStockStatus(product.quantity, product.alertThreshold)}
-                          label={product.quantity <= product.alertThreshold ? 'Alerte' : 'OK'}
-                        />
-                      </Box>
-                    </TableCell>
-                    <TableCell>
-                      <ButtonGroup>
-                        <Button startIcon={<EditIcon />} onClick={() => handleOpenDialog(product)}>Modifier</Button>
-                        <Button startIcon={<DeleteIcon />} color="error" onClick={() => deleteProduct(product._id)}>Supprimer</Button>
-                      </ButtonGroup>
+                {isLoading ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <CircularProgress />
                     </TableCell>
                   </TableRow>
-                ))}
+                ) : error ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <Typography color="error">Erreur de chargement</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : getFilteredProducts().length === 0 ? (
+                  <TableRow>
+                    <TableCell colSpan={5} align="center">
+                      <Typography>Aucun produit trouvé</Typography>
+                    </TableCell>
+                  </TableRow>
+                ) : (
+                  getFilteredProducts()
+                    .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                    .map((product) => (
+                      <TableRow key={product.id}>
+                        <TableCell>{product.nom}</TableCell>
+                        <TableCell>{product.categorie_id}</TableCell>
+                        <TableCell>{formatPrice(product.prix)}</TableCell>
+                        <TableCell>
+                          <Chip
+                            label={`${product.stock} unités`}
+                            color={getStockStatus(product.stock, product.stock_min)}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <ButtonGroup>
+                            <Button
+                              startIcon={<EditIcon />}
+                              onClick={() => handleOpenDialog(product)}
+                            >
+                              Modifier
+                            </Button>
+                            <Button
+                              startIcon={<DeleteIcon />}
+                              color="error"
+                              onClick={() => deleteProduct(product.id)}
+                            >
+                              Supprimer
+                            </Button>
+                          </ButtonGroup>
+                        </TableCell>
+                      </TableRow>
+                    ))
+                )}
               </TableBody>
             </Table>
           </TableContainer>
+          <TablePagination
+            rowsPerPageOptions={[10, 25, 50]}
+            component="div"
+            count={getFilteredProducts().length}
+            rowsPerPage={rowsPerPage}
+            page={page}
+            onPageChange={(e, newPage) => setPage(newPage)}
+            onRowsPerPageChange={(e) => {
+              setRowsPerPage(parseInt(e.target.value, 10));
+              setPage(0);
+            }}
+          />
         </Paper>
 
-        {/* Pagination */}
-        <TablePagination
-          component="div"
-          count={getFilteredProducts().length}
-          page={page}
-          onPageChange={(e, newPage) => setPage(newPage)}
-          rowsPerPage={ITEMS_PER_PAGE}
-          rowsPerPageOptions={[ITEMS_PER_PAGE]}
-        />
-
-        {/* Dialog de modification */}
+        {/* Dialog pour ajouter/modifier un produit */}
         <Dialog
           open={dialog.open}
           onClose={handleCloseDialog}
           maxWidth="md"
           fullWidth
         >
-          <DialogTitle>{selectedProduct ? 'Modifier produit' : 'Nouveau produit'}</DialogTitle>
+          <DialogTitle>
+            {selectedProduct ? 'Modifier le produit' : 'Ajouter un nouveau produit'}
+          </DialogTitle>
           <DialogContent>
             {renderFormContent()}
           </DialogContent>
           <DialogActions>
             <Button onClick={handleCloseDialog}>Annuler</Button>
-            <Button onClick={handleSubmit} variant="contained" color="primary">
-              {selectedProduct ? 'Modifier' : 'Créer'}
+            <Button
+              onClick={handleSubmit}
+              color="primary"
+              variant="contained"
+              disabled={createMutation.isLoading || updateMutation.isLoading}
+            >
+              {selectedProduct ? 'Mettre à jour' : 'Créer'}
+              {(createMutation.isLoading || updateMutation.isLoading) && (
+                <CircularProgress size={24} sx={{ ml: 1 }} />
+              )}
             </Button>
           </DialogActions>
         </Dialog>
-
-        {/* Notification */}
-        <Snackbar
-          open={notification.open}
-          autoHideDuration={6000}
-          onClose={closeNotification}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          <Alert
-            onClose={closeNotification}
-            severity={notification.severity}
-            sx={{ width: '100%' }}
-          >
-            {notification.message}
-          </Alert>
-        </Snackbar>
       </Box>
     </LocalizationProvider>
   );

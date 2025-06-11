@@ -39,13 +39,10 @@ router.get('/:id', async (req, res) => {
 // Créer un nouveau produit (requiert authentification)
 router.post('/', auth, async (req, res) => {
     try {
-        const { nom, description, prix, stock, categorie_id } = req.body;
-        const [result] = await pool.query(
-            'INSERT INTO produits (nom, description, prix, stock, categorie_id) VALUES (?, ?, ?, ?, ?)',
-            [nom, description, prix, stock, categorie_id]
-        );
-        res.status(201).json({ id: result.insertId });
+        const productId = await Product.create(req.body);
+        res.status(201).json({ id: productId });
     } catch (error) {
+        console.error('Erreur dans la route POST /products:', error);
         res.status(500).json({ error: 'Erreur lors de la création du produit' });
     }
 });
