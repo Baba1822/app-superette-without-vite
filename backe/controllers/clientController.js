@@ -130,6 +130,15 @@ exports.updateClientPreferences = async (req, res) => {
     }
 };
 
+exports.getAllClients = async (req, res) => {
+    try {
+        const clients = await Client.getClients();
+        res.json(clients);
+    } catch (error) {
+        res.status(500).json({ error: 'Erreur lors de la récupération des clients' });
+    }
+};
+
 exports.getClientStatistics = async (req, res) => {
     try {
         const stats = await Client.getClientStatistics(req.params.clientId);

@@ -10,35 +10,21 @@ try {
     console.error('Erreur lors du chargement du contrôleur adminDashboard:', error);
 }
 
-// Middleware d'authentification optionnel pour le debug
+// Middleware d'authentification simplifié pour le debug
 const auth = (req, res, next) => {
-    console.log('Middleware auth - requête reçue:', req.path);
-    try {
-        // Récupérer le token du header Authorization
-        const authHeader = req.header('Authorization');
-        if (!authHeader) {
-            return res.status(401).json({ error: 'Token d\'accès requis' });
-        }
-
-        // Extraire le token (doit être au format 'Bearer <token>')
-        const token = authHeader.replace('Bearer ', '');
-        if (!token) {
-            return res.status(401).json({ error: 'Format de token invalide' });
-        }
-
-        // Vérifier le format du token
-        if (!/^Bearer [A-Za-z0-9-_=]+\.[A-Za-z0-9-_=]+\.?[A-Za-z0-9-_.+/=]*$/.test(authHeader)) {
-            return res.status(401).json({ error: 'Format de token invalide' });
-        }
-
-        // Pour l'instant, on désactive la vérification JWT pour le debug
-        // À implémenter : vérification du JWT avec la clé secrète
-        next();
-    } catch (error) {
-        console.error('Erreur dans le middleware auth:', error);
-        res.status(401).json({ error: 'Erreur d\'authentification' });
+    console.log(`Middleware auth - ${req.method} ${req.path}`);
+    
+    // Pour le debug, on accepte toutes les requêtes
+    // En production, vous devriez vérifier le JWT token
+    const authHeader = req.header('Authorization');
+    
+    if (!authHeader) {
+        console.log('Pas de token d\'autorisation - continuons pour le debug');
+        // return res.status(401).json({ error: 'Token d\'accès requis' });
     }
-}
+    
+    next();
+};
 
 // Route de test pour vérifier que les routes fonctionnent
 router.get('/test', (req, res) => {
@@ -46,30 +32,105 @@ router.get('/test', (req, res) => {
     res.json({ 
         message: 'Routes admin dashboard fonctionnelles',
         timestamp: new Date().toISOString(),
-        path: req.path 
+        path: req.path,
+        baseUrl: req.baseUrl,
+        originalUrl: req.originalUrl
     });
+});
+
+// Log de debug pour voir toutes les requêtes
+router.use((req, res, next) => {
+    console.log(`Route admin dashboard appelée: ${req.method} ${req.path}`);
+    console.log('Headers:', req.headers);
+    console.log('Query params:', req.query);
+    next();
 });
 
 // Routes pour le dashboard admin
 if (adminDashboardController) {
-    router.get('/stats', auth, adminDashboardController.getDashboardStats);
-    router.get('/top-products', auth, adminDashboardController.getTopProducts);
-    router.get('/recent-orders', auth, adminDashboardController.getRecentOrders);
-    router.get('/stock-alerts', auth, adminDashboardController.getStockAlerts);
-    router.get('/sales-data', auth, adminDashboardController.getSalesData);
-    router.get('/sales-history', auth, adminDashboardController.getSalesHistory);
-    router.get('/client-stats', auth, adminDashboardController.getClientStats);
+    // Route pour les statistiques générales
+    router.get('/stats', auth, (req, res) => {
+        console.log('Route /stats appelée');
+        adminDashboardController.getDashboardStats(req, res);
+    });
+
+    // Route pour les top produits
+    router.get('/top-products', auth, (req, res) => {
+        console.log('Route /top-products appelée avec limit:', req.query.limit);
+        adminDashboardController.getTopProducts(req, res);
+    });
+
+    // Route pour les commandes récentes
+    router.get('/recent-orders', auth, (req, res) => {
+        console.log('Route /recent-orders appelée');
+        adminDashboardController.getRecentOrders(req, res);
+    });
+
+    // Route pour les alertes de stock
+    router.get('/stock-alerts', auth, (req, res) => {
+        console.log('Route /stock-alerts appelée');
+        adminDashboardController.getStockAlerts(req, res);
+    });
+
+    // Route pour les données de ventes
+    router.get('/sales-data', auth, (req, res) => {
+        console.log('Route /sales-data appelée');
+        adminDashboardController.getSalesData(req, res);
+    });
+
+    // Route pour l'historique des ventes
+    router.get('/sales-history', auth, (req, res) => {
+        console.log('Route /sales-history appelée avec dates:', req.query);
+        adminDashboardController.getSalesHistory(req, res);
+    });
+
+    // Route pour les statistiques des clients
+    router.get('/client-stats', auth, (req, res) => {
+        console.log('Route /client-stats appelée');
+        adminDashboardController.getClientStats(req, res);
+    });
+
     console.log('Toutes les routes admin dashboard sont configurées');
 } else {
     // Routes de fallback si le contrôleur n'est pas disponible
-    router.get('/stats', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/top-products', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/recent-orders', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/stock-alerts', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/sales-data', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/sales-history', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
-    router.get('/client-stats', (req, res) => res.status(500).json({ error: 'Contrôleur non disponible' }));
+    const fallbackHandler = (routeName) => (req, res) => {
+        console.error(`Contrôleur non disponible pour la route ${routeName}`);
+        res.status(500).json({ 
+            error: 'Contrôleur non disponible',
+            route: routeName,
+            timestamp: new Date().toISOString()
+        });
+    };
+
+    router.get('/stats', fallbackHandler('stats'));
+    router.get('/top-products', fallbackHandler('top-products'));
+    router.get('/recent-orders', fallbackHandler('recent-orders'));
+    router.get('/stock-alerts', fallbackHandler('stock-alerts'));
+    router.get('/sales-data', fallbackHandler('sales-data'));
+    router.get('/sales-history', fallbackHandler('sales-history'));
+    router.get('/client-stats', fallbackHandler('client-stats'));
+    
     console.log('Routes admin dashboard configurées avec fallback');
 }
+
+// Route catch-all pour les routes non trouvées
+router.use('*', (req, res) => {
+    console.log(`Route non trouvée: ${req.method} ${req.originalUrl}`);
+    res.status(404).json({
+        error: 'Route non trouvée',
+        path: req.path,
+        method: req.method,
+        availableRoutes: [
+            'GET /api/admin/dashboard/test',
+            'GET /api/admin/dashboard/stats',
+            'GET /api/admin/dashboard/top-products',
+            'GET /api/admin/dashboard/recent-orders',
+            'GET /api/admin/dashboard/stock-alerts',
+            'GET /api/admin/dashboard/sales-data',
+            'GET /api/admin/dashboard/sales-history',
+            'GET /api/admin/dashboard/client-stats'
+        ]
+    });
+});
 
 module.exports = router;

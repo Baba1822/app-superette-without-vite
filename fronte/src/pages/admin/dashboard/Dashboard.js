@@ -12,7 +12,11 @@ import {
     Store as StoreIcon,
     Receipt as OrderIcon,
     Payment as PaymentIcon,
-    Settings as SettingsIcon
+    Settings as SettingsIcon,
+    TrendingUp as TrendingUpIcon,
+    AttachMoney as MoneyIcon,
+    Group as GroupIcon,
+    Inventory2 as ProductIcon
 } from '@mui/icons-material';
 import { BarChart, Bar, CartesianGrid, Legend, Tooltip, XAxis, YAxis, ResponsiveContainer, PieChart, Pie, Cell, LineChart, Line } from 'recharts';
 import {
@@ -38,7 +42,7 @@ import { useQuery } from '@tanstack/react-query';
 import DashboardService from '../../../services/DashboardService';
 import moment from 'moment';
 
-// Couleurs pour le graphique des ventes par catégorie
+// Couleurs pour les graphiques
 const COLORS = ['#4CAF50', '#FF9800', '#2196F3', '#009688', '#F44336'];
 
 const drawerWidth = 240;
@@ -53,19 +57,23 @@ const Dashboard = () => {
     const { data: dashboardStats, isLoading: statsLoading, error: statsError } = useQuery({
         queryKey: ['dashboardStats'],
         queryFn: DashboardService.getDashboardStats,
-        staleTime: 1000 * 60 * 5 // 5 minutes
+        staleTime: 1000 * 60 * 5, // 5 minutes
+        retry: 3,
+        retryDelay: attemptIndex => Math.min(1000 * 2 ** attemptIndex, 30000)
     });
 
     const { data: salesData, isLoading: salesLoading, error: salesError } = useQuery({
         queryKey: ['salesData'],
         queryFn: DashboardService.getSalesData,
-        staleTime: 1000 * 60 * 5
+        staleTime: 1000 * 60 * 5,
+        retry: 3
     });
 
     const { data: topProducts, isLoading: topProductsLoading, error: topProductsError } = useQuery({
         queryKey: ['topProducts'],
-        queryFn: DashboardService.getTopProducts,
-        staleTime: 1000 * 60 * 5
+        queryFn: () => DashboardService.getTopProducts(5),
+        staleTime: 1000 * 60 * 5,
+        retry: 3
     });
 
     // Calculer les dates pour l'historique des ventes (dernier mois)
@@ -75,7 +83,8 @@ const Dashboard = () => {
     const { data: salesHistory, isLoading: salesHistoryLoading, error: salesHistoryError } = useQuery({
         queryKey: ['salesHistory', startDate, endDate],
         queryFn: () => DashboardService.getSalesHistory(startDate, endDate),
-        staleTime: 1000 * 60 * 5
+        staleTime: 1000 * 60 * 5,
+        retry: 3
     });
 
     // Gestion des erreurs
@@ -97,12 +106,13 @@ const Dashboard = () => {
         { text: 'Paramètres', icon: <SettingsIcon />, path: '/administration/parametres' } 
     ];
 
-    // Données par défaut si chargement
     // Afficher un message d'erreur si présent
     if (hasError) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="error">{error.message}</Alert>
+                <Alert severity="error">
+                    Une erreur est survenue lors du chargement des données: {error?.message || 'Erreur inconnue'}
+                </Alert>
             </Box>
         );
     }
@@ -110,29 +120,26 @@ const Dashboard = () => {
     // Afficher un indicateur de chargement si tout est en cours de chargement
     if (statsLoading && salesLoading && topProductsLoading && salesHistoryLoading) {
         return (
-            <Box sx={{ p: 3 }}>
-                <CircularProgress />
-            </Box>
-        );
-    }
-
-    if (hasError) {
-        return (
-            <Box sx={{ p: 3 }}>
-                <Alert severity="error">
-                    Une erreur est survenue lors du chargement des données: {error.message}
-                </Alert>
-            </Box>
-        );
-    }
-
-    if (statsLoading || salesLoading || topProductsLoading || salesHistoryLoading) {
-        return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '50vh' }}>
                 <CircularProgress />
             </Box>
         );
     }
+
+    // Données par défaut si pas de données
+    const defaultStats = {
+        statCards: [
+            { title: 'Total Ventes', value: 0, trend: '+0%', icon: <TrendingUpIcon /> },
+            { title: 'Chiffre d\'affaires', value: '0 €', trend: '+0%', icon: <MoneyIcon /> },
+            { title: 'Total Clients', value: 0, trend: '+0%', icon: <GroupIcon /> },
+            { title: 'Total Produits', value: 0, trend: '+0%', icon: <ProductIcon /> }
+        ]
+    };
+
+    const stats = dashboardStats || defaultStats;
+    const sales = salesData || [];
+    const products = topProducts || [];
+    const history = salesHistory || [];
 
     return (
         <Box sx={{ display: 'flex' }}>
@@ -163,7 +170,7 @@ const Dashboard = () => {
                                 }
                             }}
                         >
-                            <ListItemIcon>
+                            <ListItemIcon sx={{ color: 'inherit' }}>
                                 {item.icon}
                             </ListItemIcon>
                             <ListItemText primary={item.text} />
@@ -179,7 +186,7 @@ const Dashboard = () => {
 
                 {/* Statistiques */}
                 <Grid container spacing={3}>
-                    {dashboardStats?.statCards?.map((card) => (
+                    {stats.statCards?.map((card, index) => (
                         <Grid item xs={12} sm={6} md={3} key={card.title}>
                             <Card sx={{ height: '100%' }}>
                                 <CardContent>
@@ -208,13 +215,13 @@ const Dashboard = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" gutterBottom>
-                                    Ventes par catégorie
+                                    Ventes par période
                                 </Typography>
-                                {salesData?.length > 0 ? (
+                                {!salesLoading && sales.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={300}>
                                         <PieChart>
                                             <Pie
-                                                data={salesData}
+                                                data={sales}
                                                 cx="50%"
                                                 cy="50%"
                                                 innerRadius={60}
@@ -223,16 +230,21 @@ const Dashboard = () => {
                                                 paddingAngle={5}
                                                 dataKey="value"
                                             >
-                                                {salesData.map((entry, index) => (
-                                                    <Cell key={`cell-${index}`} fill={["#4CAF50", "#FF9800", "#2196F3", "#009688", "#F44336"][index % 5]} />
+                                                {sales.map((entry, index) => (
+                                                    <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                                 ))}
                                             </Pie>
+                                            <Tooltip />
                                             <Legend />
                                         </PieChart>
                                     </ResponsiveContainer>
+                                ) : salesLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                                        <CircularProgress />
+                                    </Box>
                                 ) : (
-                                    <Typography variant="body2" color="text.secondary">
-                                        Aucune donnée disponible
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 10 }}>
+                                        Aucune donnée de vente disponible
                                     </Typography>
                                 )}
                             </CardContent>
@@ -246,18 +258,22 @@ const Dashboard = () => {
                                 <Typography variant="h6" gutterBottom>
                                     Top produits
                                 </Typography>
-                                {topProducts?.length > 0 ? (
+                                {!topProductsLoading && products.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={300}>
-                                        <BarChart data={topProducts}>
+                                        <BarChart data={products}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="name" />
                                             <YAxis />
                                             <Tooltip />
-                                            <Bar dataKey="value" fill="#8884d8" />
+                                            <Bar dataKey="value" fill="#4CAF50" />
                                         </BarChart>
                                     </ResponsiveContainer>
+                                ) : topProductsLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                                        <CircularProgress />
+                                    </Box>
                                 ) : (
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 10 }}>
                                         Aucun produit disponible
                                     </Typography>
                                 )}
@@ -270,20 +286,24 @@ const Dashboard = () => {
                         <Card>
                             <CardContent>
                                 <Typography variant="h6" gutterBottom>
-                                    Historique des ventes
+                                    Historique des ventes (30 derniers jours)
                                 </Typography>
-                                {salesHistory?.length > 0 ? (
+                                {!salesHistoryLoading && history.length > 0 ? (
                                     <ResponsiveContainer width="100%" height={300}>
-                                        <LineChart data={salesHistory}>
+                                        <LineChart data={history}>
                                             <CartesianGrid strokeDasharray="3 3" />
                                             <XAxis dataKey="date" />
                                             <YAxis />
                                             <Tooltip />
-                                            <Line type="monotone" dataKey="amount" stroke="#8884d8" />
+                                            <Line type="monotone" dataKey="amount" stroke="#2196F3" strokeWidth={2} />
                                         </LineChart>
                                     </ResponsiveContainer>
+                                ) : salesHistoryLoading ? (
+                                    <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 300 }}>
+                                        <CircularProgress />
+                                    </Box>
                                 ) : (
-                                    <Typography variant="body2" color="text.secondary">
+                                    <Typography variant="body2" color="text.secondary" sx={{ textAlign: 'center', py: 10 }}>
                                         Aucune donnée historique disponible
                                     </Typography>
                                 )}

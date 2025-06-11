@@ -1,7 +1,4 @@
 require('dotenv').config();
-const dotenv = require('dotenv');
-dotenv.config();
-
 const express = require('express');
 const cors = require('cors');
 const errorHandler = require('./utils/errorHandler');
@@ -143,3 +140,5 @@ server.on('error', (error) => {
             throw error;
     }
 });
+
+module.exports = app;

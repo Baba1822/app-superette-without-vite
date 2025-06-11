@@ -1,7 +1,7 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const BASE_URL = `${API_BASE_URL}/clients`;
+const BASE_URL = `${API_BASE_URL}/api/clients`;
 
 export const clientService = {
   // Récupérer tous les clients (admin)

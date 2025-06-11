@@ -1,10 +1,11 @@
 const express = require('express');
 const router = express.Router();
 const { validate } = require('../utils/validators');
-const { createClient, getClientById, getClients, updateClient, deleteClient, getPurchaseHistory, getLoyaltyPoints, addLoyaltyPoints, addAddress, getAddresses, updateAddress, deleteAddress, getClientPreferences, updateClientPreferences, getClientStatistics } = require('../controllers/clientController');
+const { createClient, getClientById, getClients, updateClient, deleteClient, getPurchaseHistory, getLoyaltyPoints, addLoyaltyPoints, addAddress, getAddresses, updateAddress, deleteAddress, getClientPreferences, updateClientPreferences, getClientStatistics, getAllClients } = require('../controllers/clientController');
 
 // Routes pour les clients
 router.post('/', validate, createClient);
+router.get('/', getAllClients);
 router.get('/:id', getClientById);
 router.get('/email/:email', getClients);
 router.put('/:id', validate, updateClient);

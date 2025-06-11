@@ -163,7 +163,7 @@ function Customers() {
               .map((client) => (
                 <TableRow key={client.id}>
                   <TableCell>{client.id}</TableCell>
-                  <TableCell>{client?.firstName || ''} {client?.lastName || ''}</TableCell>
+                  <TableCell>{(client?.nom || '') + ' ' + (client?.prenom || '')}</TableCell>
                   <TableCell>{client.email}</TableCell>
                   <TableCell>
                     {new Date(client.createdAt).toLocaleDateString()}
@@ -230,7 +230,7 @@ function Customers() {
                   Informations personnelles
                 </Typography>
                 <Typography>
-                  <strong>Nom:</strong> {selectedClient?.firstName || ''} {selectedClient?.lastName || ''}
+                  <strong>Nom:</strong> {selectedClient?.nom || ''} {selectedClient?.prenom || ''}
                 </Typography>
                 <Typography>
                   <strong>Email:</strong> {selectedClient.email}
@@ -272,7 +272,7 @@ function Customers() {
                 <TextField
                   fullWidth
                   label="Prénom"
-                  value={selectedClient.firstName}
+                  value={selectedClient.prenom}
                   margin="normal"
                 />
               </Grid>
@@ -280,7 +280,7 @@ function Customers() {
                 <TextField
                   fullWidth
                   label="Nom"
-                  value={selectedClient.lastName}
+                  value={selectedClient.nom}
                   margin="normal"
                 />
               </Grid>
