@@ -2,43 +2,75 @@ const pool = require('../config/db');
 
 class Supplier {
     static async getAll() {
-        const [suppliers] = await pool.query('SELECT * FROM fournisseurs');
-        return suppliers;
+        try {
+            const [suppliers] = await pool.query('SELECT * FROM fournisseurs');
+            return suppliers;
+        } catch (error) {
+            console.error('Error in Supplier.getAll:', error);
+            throw error;
+        }
     }
 
     static async getById(id) {
-        const [suppliers] = await pool.query(
-            'SELECT * FROM fournisseurs WHERE id = ?',
-            [id]
-        );
-        return suppliers[0];
+        try {
+            const [suppliers] = await pool.query(
+                'SELECT * FROM fournisseurs WHERE id = ?',
+                [id]
+            );
+            return suppliers[0];
+        } catch (error) {
+            console.error('Error in Supplier.getById:', error);
+            throw error;
+        }
     }
 
     static async create(supplierData) {
-        const [result] = await pool.query(
-            'INSERT INTO fournisseurs (nom, telephone, email, adresse) VALUES (?, ?, ?, ?)',
-            [supplierData.nom, supplierData.telephone, supplierData.email, supplierData.adresse]
-        );
-        return result.insertId;
+        try {
+            const [result] = await pool.query(
+                'INSERT INTO fournisseurs (nom, telephone, email, adresse) VALUES (?, ?, ?, ?)',
+                [supplierData.nom, supplierData.telephone, supplierData.email, supplierData.adresse]
+            );
+            return result.insertId;
+        } catch (error) {
+            console.error('Error in Supplier.create:', error);
+            throw error;
+        }
     }
 
     static async update(id, supplierData) {
-        await pool.query(
-            'UPDATE fournisseurs SET nom = ?, telephone = ?, email = ?, adresse = ? WHERE id = ?',
-            [supplierData.nom, supplierData.telephone, supplierData.email, supplierData.adresse, id]
-        );
+        try {
+            await pool.query(
+                'UPDATE fournisseurs SET nom = ?, telephone = ?, email = ?, adresse = ? WHERE id = ?',
+                [supplierData.nom, supplierData.telephone, supplierData.email, supplierData.adresse, id]
+            );
+            return true;
+        } catch (error) {
+            console.error('Error in Supplier.update:', error);
+            throw error;
+        }
     }
 
     static async delete(id) {
-        await pool.query('DELETE FROM fournisseurs WHERE id = ?', [id]);
+        try {
+            await pool.query('DELETE FROM fournisseurs WHERE id = ?', [id]);
+            return true;
+        } catch (error) {
+            console.error('Error in Supplier.delete:', error);
+            throw error;
+        }
     }
 
     static async search(query) {
-        const [suppliers] = await pool.query(
-            'SELECT * FROM fournisseurs WHERE nom LIKE ? OR email LIKE ? OR telephone LIKE ?',
-            [`%${query}%`, `%${query}%`, `%${query}%`]
-        );
-        return suppliers;
+        try {
+            const [suppliers] = await pool.query(
+                'SELECT * FROM fournisseurs WHERE nom LIKE ? OR email LIKE ? OR telephone LIKE ?',
+                [`%${query}%`, `%${query}%`, `%${query}%`]
+            );
+            return suppliers;
+        } catch (error) {
+            console.error('Error in Supplier.search:', error);
+            throw error;
+        }
     }
 }
 

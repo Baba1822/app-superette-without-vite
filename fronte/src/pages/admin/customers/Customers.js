@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Box,
   Paper,
@@ -31,7 +31,7 @@ import {
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { clientService } from '../../../services/clientService';
+import customerService from '../../../services/CustomerService';
 import { toast } from 'react-toastify';
 
 const ITEMS_PER_PAGE = 10;
@@ -39,64 +39,84 @@ const ITEMS_PER_PAGE = 10;
 function Customers() {
   const queryClient = useQueryClient();
   const [page, setPage] = useState(0);
-  const [selectedClient, setSelectedClient] = useState(null);
-  const [viewMode, setViewMode] = useState('list'); // 'list', 'details', 'edit'
-  const [clientStats, setClientStats] = useState(null);
+  const [selectedCustomer, setSelectedCustomer] = useState(null);
+  const [viewMode, setViewMode] = useState('list');
+  const [customerStats, setCustomerStats] = useState(null);
+  const [editFormData, setEditFormData] = useState({});
 
-  // Récupérer la liste des clients
-  const { data: clients = [], isLoading, error } = useQuery({
-    queryKey: ['clients'],
-    queryFn: clientService.getAllClients,
+  const { 
+    data: customers = [], 
+    isLoading, 
+    error, 
+    refetch 
+  } = useQuery({
+    queryKey: ['customers'],
+    queryFn: () => customerService.getAllCustomers(),
     staleTime: 5 * 60 * 1000
   });
 
-  // Mutation pour mettre à jour le statut d'un client
   const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => clientService.updateClientStatus(id, status),
+    mutationFn: ({ id, status }) => customerService.updateCustomerStatus(id, status),
     onSuccess: () => {
-      queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['customers']);
       toast.success('Statut du client mis à jour avec succès');
     },
-    onError: () => {
-      toast.error('Erreur lors de la mise à jour du statut');
+    onError: (error) => {
+      toast.error(`Erreur lors de la mise à jour du statut: ${error.message}`);
     }
   });
 
-  // Mutation pour supprimer un client
   const deleteMutation = useMutation({
-    mutationFn: (id) => clientService.deleteClient(id),
+    mutationFn: (id) => customerService.deleteCustomer(id),
     onSuccess: () => {
-      queryClient.invalidateQueries(['clients']);
+      queryClient.invalidateQueries(['customers']);
       toast.success('Client supprimé avec succès');
     },
-    onError: () => {
-      toast.error('Erreur lors de la suppression du client');
+    onError: (error) => {
+      toast.error(`Erreur lors de la suppression du client: ${error.message}`);
     }
   });
 
-  // Charger les statistiques du client
-  const loadClientStats = async (clientId) => {
+  const updateCustomerMutation = useMutation({
+    mutationFn: ({ id, data }) => customerService.updateCustomer(id, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['customers']);
+      toast.success('Client mis à jour avec succès');
+      handleCloseDialog();
+    },
+    onError: (error) => {
+      toast.error(`Erreur lors de la mise à jour du client: ${error.message}`);
+    }
+  });
+
+  const loadCustomerStats = async (customerId) => {
     try {
-      const stats = await clientService.getClientStats(clientId);
-      setClientStats(stats);
+      const stats = await customerService.getCustomerStats(customerId);
+      setCustomerStats(stats);
     } catch (error) {
-      console.error('Error loading client stats:', error);
+      console.error('Error loading customer stats:', error);
       toast.error('Erreur lors du chargement des statistiques');
     }
   };
 
-  const handleViewClient = async (client) => {
-    setSelectedClient(client);
+  const handleViewCustomer = async (customer) => {
+    setSelectedCustomer(customer);
     setViewMode('details');
-    await loadClientStats(client.id);
+    await loadCustomerStats(customer.id);
   };
 
-  const handleEditClient = (client) => {
-    setSelectedClient(client);
+  const handleEditCustomer = (customer) => {
+    setSelectedCustomer(customer);
+    setEditFormData({
+      prenom: customer.prenom || '',
+      nom: customer.nom || '',
+      email: customer.email,
+      status: customer.status || 'pending'
+    });
     setViewMode('edit');
   };
 
-  const handleDeleteClient = async (id) => {
+  const handleDeleteCustomer = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
       await deleteMutation.mutateAsync(id);
     }
@@ -107,9 +127,26 @@ function Customers() {
   };
 
   const handleCloseDialog = () => {
-    setSelectedClient(null);
+    setSelectedCustomer(null);
     setViewMode('list');
-    setClientStats(null);
+    setCustomerStats(null);
+    setEditFormData({});
+  };
+
+  const handleEditFormChange = (e) => {
+    const { name, value } = e.target;
+    setEditFormData(prev => ({
+      ...prev,
+      [name]: value
+    }));
+  };
+
+  const handleSaveCustomer = async () => {
+    if (!selectedCustomer) return;
+    await updateCustomerMutation.mutateAsync({
+      id: selectedCustomer.id,
+      data: editFormData
+    });
   };
 
   const getStatusChip = (status) => {
@@ -158,43 +195,34 @@ function Customers() {
             </TableRow>
           </TableHead>
           <TableBody>
-            {clients
+            {customers
               .slice(page * ITEMS_PER_PAGE, (page + 1) * ITEMS_PER_PAGE)
-              .map((client) => (
-                <TableRow key={client.id}>
-                  <TableCell>{client.id}</TableCell>
-                  <TableCell>{(client?.nom || '') + ' ' + (client?.prenom || '')}</TableCell>
-                  <TableCell>{client.email}</TableCell>
+              .map((customer) => (
+                <TableRow key={customer.id}>
+                  <TableCell>{customer.id}</TableCell>
+                  <TableCell>{`${customer.prenom || ''} ${customer.nom || ''}`}</TableCell>
+                  <TableCell>{customer.email}</TableCell>
                   <TableCell>
-                    {new Date(client.createdAt).toLocaleDateString()}
+                    {new Date(customer.date_inscription || customer.createdAt).toLocaleDateString()}
                   </TableCell>
-                  <TableCell>{getStatusChip(client.status)}</TableCell>
+                  <TableCell>{getStatusChip(customer.status)}</TableCell>
                   <TableCell>
-                    <IconButton
-                      onClick={() => handleViewClient(client)}
-                      color="primary"
-                    >
+                    <IconButton onClick={() => handleViewCustomer(customer)} color="primary">
                       <VisibilityIcon />
                     </IconButton>
-                    <IconButton
-                      onClick={() => handleEditClient(client)}
-                      color="primary"
-                    >
+                    <IconButton onClick={() => handleEditCustomer(customer)} color="primary">
                       <EditIcon />
                     </IconButton>
                     <IconButton
                       onClick={() => handleUpdateStatus(
-                        client.id,
-                        client.status === 'active' ? 'inactive' : 'active'
+                        customer.id,
+                        customer.status === 'active' ? 'inactive' : 'active'
                       )}
-                      color={client.status === 'active' ? 'error' : 'success'}
+                      color={customer.status === 'active' ? 'error' : 'success'}
                     >
-                      {client.status === 'active' ? <BlockIcon /> : <CheckCircleIcon />}
+                      {customer.status === 'active' ? <BlockIcon /> : <CheckCircleIcon />}
                     </IconButton>
-                    <IconButton
-                      onClick={() => handleDeleteClient(client.id)}
-                      color="error"
-                    >
+                    <IconButton onClick={() => handleDeleteCustomer(customer.id)} color="error">
                       <DeleteIcon />
                     </IconButton>
                   </TableCell>
@@ -204,7 +232,7 @@ function Customers() {
         </Table>
         <TablePagination
           component="div"
-          count={clients.length}
+          count={customers.length}
           page={page}
           onPageChange={(e, newPage) => setPage(newPage)}
           rowsPerPage={ITEMS_PER_PAGE}
@@ -212,13 +240,7 @@ function Customers() {
         />
       </TableContainer>
 
-      {/* Dialog pour voir/modifier les détails du client */}
-      <Dialog
-        open={!!selectedClient}
-        onClose={handleCloseDialog}
-        maxWidth="md"
-        fullWidth
-      >
+      <Dialog open={!!selectedCustomer} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
           {viewMode === 'details' ? 'Détails du Client' : 'Modifier le Client'}
         </DialogTitle>
@@ -229,37 +251,20 @@ function Customers() {
                 <Typography variant="h6" gutterBottom>
                   Informations personnelles
                 </Typography>
-                <Typography>
-                  <strong>Nom:</strong> {selectedClient?.nom || ''} {selectedClient?.prenom || ''}
-                </Typography>
-                <Typography>
-                  <strong>Email:</strong> {selectedClient.email}
-                </Typography>
-                <Typography>
-                  <strong>Téléphone:</strong> {selectedClient.phone || 'Non renseigné'}
-                </Typography>
-                <Typography>
-                  <strong>Adresse:</strong> {selectedClient.address || 'Non renseignée'}
-                </Typography>
+                <Typography><strong>Nom:</strong> {selectedCustomer?.prenom || ''} {selectedCustomer?.nom || ''}</Typography>
+                <Typography><strong>Email:</strong> {selectedCustomer?.email}</Typography>
+                <Typography><strong>Téléphone:</strong> {selectedCustomer?.telephone || 'Non renseigné'}</Typography>
+                <Typography><strong>Adresse:</strong> {selectedCustomer?.adresse || 'Non renseignée'}</Typography>
               </Grid>
               <Grid item xs={12} md={6}>
                 <Typography variant="h6" gutterBottom>
                   Statistiques
                 </Typography>
-                {clientStats ? (
+                {customerStats ? (
                   <>
-                    <Typography>
-                      <strong>Nombre de commandes:</strong> {clientStats.totalOrders}
-                    </Typography>
-                    <Typography>
-                      <strong>Montant total des achats:</strong> {clientStats.totalSpent.toFixed(2)} €
-                    </Typography>
-                    <Typography>
-                      <strong>Dernière commande:</strong>{' '}
-                      {clientStats.lastOrderDate
-                        ? new Date(clientStats.lastOrderDate).toLocaleDateString()
-                        : 'Aucune commande'}
-                    </Typography>
+                    <Typography><strong>Nombre de commandes:</strong> {customerStats.totalOrders || 0}</Typography>
+                    <Typography><strong>Montant total des achats:</strong> {customerStats.totalSpent?.toFixed(2) || '0.00'} €</Typography>
+                    <Typography><strong>Dernière commande:</strong> {customerStats.lastOrderDate ? new Date(customerStats.lastOrderDate).toLocaleDateString() : 'Aucune commande'}</Typography>
                   </>
                 ) : (
                   <CircularProgress size={20} />
@@ -271,24 +276,30 @@ function Customers() {
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
+                  name="prenom"
                   label="Prénom"
-                  value={selectedClient.prenom}
+                  value={editFormData.prenom || ''}
+                  onChange={handleEditFormChange}
                   margin="normal"
                 />
               </Grid>
               <Grid item xs={12} md={6}>
                 <TextField
                   fullWidth
+                  name="nom"
                   label="Nom"
-                  value={selectedClient.nom}
+                  value={editFormData.nom || ''}
+                  onChange={handleEditFormChange}
                   margin="normal"
                 />
               </Grid>
               <Grid item xs={12}>
                 <TextField
                   fullWidth
+                  name="email"
                   label="Email"
-                  value={selectedClient.email}
+                  value={editFormData.email || ''}
+                  onChange={handleEditFormChange}
                   margin="normal"
                 />
               </Grid>
@@ -296,8 +307,10 @@ function Customers() {
                 <TextField
                   fullWidth
                   select
+                  name="status"
                   label="Statut"
-                  value={selectedClient.status}
+                  value={editFormData.status || 'pending'}
+                  onChange={handleEditFormChange}
                   margin="normal"
                 >
                   <MenuItem value="active">Actif</MenuItem>
@@ -309,19 +322,15 @@ function Customers() {
           )}
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>
-            Fermer
-          </Button>
+          <Button onClick={handleCloseDialog}>Fermer</Button>
           {viewMode === 'edit' && (
             <Button
               variant="contained"
               color="primary"
-              onClick={() => {
-                // Logique de mise à jour
-                handleCloseDialog();
-              }}
+              onClick={handleSaveCustomer}
+              disabled={updateCustomerMutation.isLoading}
             >
-              Enregistrer
+              {updateCustomerMutation.isLoading ? <CircularProgress size={24} /> : 'Enregistrer'}
             </Button>
           )}
         </DialogActions>

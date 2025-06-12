@@ -13,7 +13,7 @@ const Suppliers = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState(null);
   const [formValues, setFormValues] = useState({ 
-    nom_fournisseur: '', 
+    nom: '', 
     telephone: '', 
     adresse: '', 
     email: '' 
@@ -21,18 +21,25 @@ const Suppliers = () => {
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(5);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
 
   useEffect(() => {
     fetchSuppliers();
   }, []);
 
   const fetchSuppliers = async () => {
+    setLoading(true);
+    setError(null);
     try {
-      const response = await axios.get('http://localhost:5000/api/fournisseurs');
-      setSuppliers(response.data);
+      const response = await axios.get('http://localhost:5000/api/suppliers');
+      setSuppliers(response.data.data || response.data); // Adapté selon la structure de réponse
     } catch (error) {
-      console.error("Erreur lors du chargement des fournisseurs", error);
-      alert("Erreur lors du chargement des fournisseurs");
+      console.error("Erreur lors du chargement des fournisseurs:", error.response?.data || error.message);
+      setError(error.response?.data?.message || "Erreur lors du chargement des fournisseurs");
+      alert(error.response?.data?.message || "Erreur lors du chargement des fournisseurs");
+    } finally {
+      setLoading(false);
     }
   };
 
@@ -40,7 +47,7 @@ const Suppliers = () => {
     if (supplier) {
       setEditingSupplier(supplier);
       setFormValues({
-        nom_fournisseur: supplier.nom_fournisseur,
+        nom: supplier.nom,
         telephone: supplier.telephone,
         adresse: supplier.adresse,
         email: supplier.email
@@ -48,7 +55,7 @@ const Suppliers = () => {
     } else {
       setEditingSupplier(null);
       setFormValues({ 
-        nom_fournisseur: '', 
+        nom: '', 
         telephone: '', 
         adresse: '', 
         email: '' 
@@ -66,48 +73,53 @@ const Suppliers = () => {
   };
 
   const handleSave = async () => {
+    if (!formValues.nom || !formValues.telephone || !formValues.adresse) {
+      alert('Nom, téléphone et adresse sont obligatoires');
+      return;
+    }
+
     try {
       if (editingSupplier) {
         await axios.put(
-          `http://localhost:5000/api/fournisseurs/${editingSupplier.id_fournisseur}`,
+          `http://localhost:5000/api/suppliers/${editingSupplier.id}`,
           formValues
         );
       } else {
         await axios.post(
-          'http://localhost:5000/api/fournisseurs',
+          'http://localhost:5000/api/suppliers',
           formValues
         );
       }
       fetchSuppliers();
       handleCloseDialog();
     } catch (error) {
-      console.error("Erreur lors de l'enregistrement", error);
-      alert("Erreur lors de l'enregistrement");
+      console.error("Erreur lors de l'enregistrement:", error.response?.data || error.message);
+      alert(error.response?.data?.message || "Erreur lors de l'enregistrement");
     }
   };
 
-  const handleDelete = async (id_fournisseur) => {
+  const handleDelete = async (id) => {
     try {
-      if (!id_fournisseur) {
+      if (!id) {
         throw new Error("ID du fournisseur manquant");
       }
       
       if (window.confirm("Êtes-vous sûr de vouloir supprimer ce fournisseur ?")) {
-        await axios.delete(`http://localhost:5000/api/fournisseurs/${id_fournisseur}`);
+        await axios.delete(`http://localhost:5000/api/suppliers/${id}`);
         fetchSuppliers();
       }
     } catch (error) {
-      console.error("Erreur lors de la suppression", error);
-      alert(`Erreur lors de la suppression: ${error.response?.data?.message || error.message}`);
+      console.error("Erreur lors de la suppression:", error.response?.data || error.message);
+      alert(error.response?.data?.message || "Erreur lors de la suppression");
     }
   };
 
   const handleSendSMS = (supplier) => {
-    alert(`Envoi des identifiants à ${supplier.nom_fournisseur} (${supplier.telephone})`);
+    alert(`Envoi des identifiants à ${supplier.nom} (${supplier.telephone})`);
   };
 
   const filteredSuppliers = suppliers.filter(s =>
-    s.nom_fournisseur.toLowerCase().includes(search.toLowerCase())
+    s.nom.toLowerCase().includes(search.toLowerCase())
   );
 
   const handleChangePage = (event, newPage) => {
@@ -118,6 +130,9 @@ const Suppliers = () => {
     setRowsPerPage(+event.target.value);
     setPage(0);
   };
+
+  if (loading) return <Typography>Chargement...</Typography>;
+  if (error) return <Typography color="error">{error}</Typography>;
 
   return (
     <Box p={3}>
@@ -149,10 +164,10 @@ const Suppliers = () => {
           <TableBody>
             {filteredSuppliers.slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage).map((supplier) => (
               <TableRow 
-                key={`supplier-${supplier.id_fournisseur}`}
+                key={`supplier-${supplier.id}`}
                 hover
               >
-                <TableCell>{supplier.nom_fournisseur}</TableCell>
+                <TableCell>{supplier.nom}</TableCell>
                 <TableCell>{supplier.telephone}</TableCell>
                 <TableCell>{supplier.email}</TableCell>
                 <TableCell>{supplier.adresse}</TableCell>
@@ -168,7 +183,7 @@ const Suppliers = () => {
                     </IconButton>
                   </Tooltip>
                   <Tooltip title="Supprimer">
-                    <IconButton onClick={() => handleDelete(supplier.id_fournisseur)}>
+                    <IconButton onClick={() => handleDelete(supplier.id)}>
                       <Delete />
                     </IconButton>
                   </Tooltip>
@@ -194,8 +209,8 @@ const Suppliers = () => {
           <TextField
             margin="dense"
             label="Nom"
-            name="nom_fournisseur"
-            value={formValues.nom_fournisseur}
+            name="nom"
+            value={formValues.nom}
             onChange={handleChange}
             fullWidth
             required

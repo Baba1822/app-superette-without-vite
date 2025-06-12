@@ -1,139 +1,191 @@
 import axios from 'axios';
 
 class CustomerService {
-    constructor() {
-        this.apiUrl = process.env.REACT_APP_API_URL;
-    }
+  constructor() {
+    // Configuration de l'URL de base
+    this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+    this.apiUrl = `${this.baseUrl}/api/customers`;
+    
+    console.log('CustomerService initialisé avec URL:', this.apiUrl);
+    
+    // Création de l'instance axios avec configuration optimisée
+    this.axiosInstance = axios.create({
+      baseURL: this.baseUrl,
+      timeout: 10000, // 10 secondes de timeout
+      withCredentials: true,
+      headers: {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json'
+      }
+    });
 
-    // Récupérer tous les clients
-    async getAllCustomers() {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers`);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la récupération des clients:', error);
-            throw error;
+    // Intercepteur pour ajouter le token à chaque requête
+    this.axiosInstance.interceptors.request.use(
+      (config) => {
+        console.log(`Requête ${config.method?.toUpperCase()} vers:`, config.url);
+        const token = localStorage.getItem('token');
+        if (token) {
+          config.headers.Authorization = `Bearer ${token}`;
         }
-    }
+        return config;
+      },
+      (error) => {
+        console.error('Erreur dans l\'intercepteur de requête:', error);
+        return Promise.reject(error);
+      }
+    );
 
-    // Récupérer un client par son ID
-    async getCustomerById(id) {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers/${id}`);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la récupération du client:', error);
-            throw error;
+    // Intercepteur pour gérer les erreurs de réponse
+    this.axiosInstance.interceptors.response.use(
+      (response) => {
+        console.log(`Réponse reçue de ${response.config.url}:`, response.status);
+        return response;
+      },
+      (error) => {
+        console.error('Erreur dans l\'intercepteur de réponse:', error);
+        if (error.response?.status === 401) {
+          console.warn('Token expiré ou invalide, redirection vers login');
+          localStorage.removeItem('token');
         }
-    }
+        return Promise.reject(error);
+      }
+    );
+  }
 
-    // Créer un nouveau client
-    async createCustomer(customerData) {
-        try {
-            const response = await axios.post(`${this.apiUrl}/customers`, customerData);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la création du client:', error);
-            throw error;
-        }
+  async getAllCustomers() {
+    try {
+      console.log('Tentative de récupération de tous les clients...');
+      const response = await this.axiosInstance.get('/api/customers');
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'récupération des clients');
+      throw error;
     }
+  }
 
-    // Mettre à jour un client
-    async updateCustomer(id, customerData) {
-        try {
-            const response = await axios.put(`${this.apiUrl}/customers/${id}`, customerData);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la mise à jour du client:', error);
-            throw error;
-        }
+  async getCustomerById(id) {
+    try {
+      const response = await this.axiosInstance.get(`/api/customers/${id}`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'récupération du client');
+      throw error;
     }
+  }
 
-    // Supprimer un client
-    async deleteCustomer(id) {
-        try {
-            await axios.delete(`${this.apiUrl}/customers/${id}`);
-            return true;
-        } catch (error) {
-            console.error('Erreur lors de la suppression du client:', error);
-            throw error;
-        }
+  async createCustomer(customerData) {
+    try {
+      const response = await this.axiosInstance.post('/api/customers', customerData);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'création du client');
+      throw error;
     }
+  }
 
-    // Gérer les points de fidélité
-    async updateLoyaltyPoints(id, points, operation = 'add') {
-        try {
-            const response = await axios.post(`${this.apiUrl}/customers/${id}/loyalty-points`, {
-                points,
-                operation
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la mise à jour des points de fidélité:', error);
-            throw error;
-        }
+  async updateCustomer(id, customerData) {
+    try {
+      const response = await this.axiosInstance.put(`/api/customers/${id}`, customerData);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'mise à jour du client');
+      throw error;
     }
+  }
 
-    // Récupérer l'historique des achats d'un client
-    async getCustomerPurchaseHistory(id) {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers/${id}/purchases`);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la récupération de l\'historique des achats:', error);
-            throw error;
-        }
+  async deleteCustomer(id) {
+    try {
+      const response = await this.axiosInstance.delete(`/api/customers/${id}`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'suppression du client');
+      throw error;
     }
+  }
 
-    // Vérifier l'éligibilité aux récompenses
-    async checkRewardsEligibility(id) {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers/${id}/rewards-eligibility`);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la vérification des récompenses:', error);
-            throw error;
-        }
+  async updateCustomerStatus(id, status) {
+    try {
+      const response = await this.axiosInstance.patch(
+        `/api/customers/${id}/status`, 
+        { status }
+      );
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'mise à jour du statut');
+      throw error;
     }
+  }
 
-    // Envoyer une notification au client
-    async sendCustomerNotification(id, notification) {
-        try {
-            const response = await axios.post(`${this.apiUrl}/customers/${id}/notifications`, notification);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de l\'envoi de la notification:', error);
-            throw error;
-        }
+  async getCustomerStats(id) {
+    try {
+      const response = await this.axiosInstance.get(`/api/customers/${id}/stats`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'récupération des statistiques');
+      throw error;
     }
+  }
 
-    // Rechercher des clients
-    async searchCustomers(query) {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers/search`, {
-                params: { q: query }
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la recherche des clients:', error);
-            throw error;
-        }
+  async updateLoyaltyPoints(id, points, operation = 'add') {
+    try {
+      const response = await this.axiosInstance.post(
+        `/api/customers/${id}/points`,
+        { points, operation }
+      );
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'mise à jour des points de fidélité');
+      throw error;
     }
+  }
 
-    // Exporter les données des clients
-    async exportCustomersData(format = 'csv') {
-        try {
-            const response = await axios.get(`${this.apiUrl}/customers/export`, {
-                params: { format },
-                responseType: 'blob'
-            });
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de l\'exportation des données:', error);
-            throw error;
-        }
+  async getCustomerPurchaseHistory(id) {
+    try {
+      const response = await this.axiosInstance.get(`/api/customers/${id}/history`);
+      return response.data;
+    } catch (error) {
+      this.handleError(error, 'récupération de l\'historique des achats');
+      throw error;
     }
+  }
+
+  handleError(error, context) {
+    console.error(`Erreur lors de la ${context}:`, error);
+    
+    if (error.response) {
+      // Le serveur a répondu avec un status d'erreur
+      console.error('Détails de l\'erreur serveur:', {
+        status: error.response.status,
+        statusText: error.response.statusText,
+        data: error.response.data,
+        url: error.config?.url,
+        method: error.config?.method?.toUpperCase()
+      });
+    } else if (error.request) {
+      // La requête a été faite mais aucune réponse n'a été reçue
+      console.error('Erreur de réseau - Aucune réponse du serveur');
+      console.log('Vérifiez que:');
+      console.log('1. Le serveur backend est démarré');
+      console.log(`2. L'URL ${this.baseUrl} est accessible`);
+      console.log('3. Aucun problème de réseau ou firewall');
+    } else {
+      // Erreur dans la configuration de la requête
+      console.error('Erreur de configuration:', error.message);
+    }
+  }
+
+  async testConnection() {
+    try {
+      const response = await this.axiosInstance.get('/api/health', {
+        timeout: 5000
+      });
+      return true;
+    } catch (error) {
+      this.handleError(error, 'test de connexion');
+      return false;
+    }
+  }
 }
 
-const customerService = new CustomerService();
-export { customerService as CustomerService }; 
+const customerServiceInstance = new CustomerService();
+export default customerServiceInstance;

@@ -4,14 +4,13 @@ import axios from 'axios';
 class LoyaltyService {
     constructor() {
         this.apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
-        this.pointsPerGNF = 0.01; // 1 point pour chaque 100 GNF dépensés
-        this.pointValueInGNF = 10; // 1 point = 10 GNF de réduction
+        this.pointsPerGNF = 0.01;
+        this.pointValueInGNF = 10;
     }
 
-    // Récupérer les informations de la carte de fidélité
     async getLoyaltyCard(clientId) {
         try {
-            const response = await axios.get(`${this.apiUrl}/loyalty/${clientId}`);
+            const response = await axios.get(`${this.apiUrl}/loyalty/cards/${clientId}`);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la récupération de la carte de fidélité:', error);
@@ -19,10 +18,9 @@ class LoyaltyService {
         }
     }
 
-    // Créer une nouvelle carte de fidélité
     async createLoyaltyCard(cardData) {
         try {
-            const response = await axios.post(`${this.apiUrl}/loyalty`, cardData);
+            const response = await axios.post(`${this.apiUrl}/loyalty/cards`, cardData);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la création de la carte:', error);
@@ -30,10 +28,9 @@ class LoyaltyService {
         }
     }
 
-    // Mettre à jour une carte de fidélité
     async updateLoyaltyCard(cardId, cardData) {
         try {
-            const response = await axios.put(`${this.apiUrl}/loyalty/${cardId}`, cardData);
+            const response = await axios.put(`${this.apiUrl}/loyalty/cards/${cardId}`, cardData);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la mise à jour de la carte:', error);
@@ -41,10 +38,9 @@ class LoyaltyService {
         }
     }
 
-    // Supprimer une carte de fidélité
     async deleteLoyaltyCard(cardId) {
         try {
-            const response = await axios.delete(`${this.apiUrl}/loyalty/${cardId}`);
+            const response = await axios.delete(`${this.apiUrl}/loyalty/cards/${cardId}`);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la suppression de la carte:', error);
@@ -52,16 +48,14 @@ class LoyaltyService {
         }
     }
 
-    // Calculer les points pour un montant d'achat
     calculatePoints(amount) {
         return Math.floor(amount * this.pointsPerGNF);
     }
 
-    // Ajouter des points à la carte de fidélité
     async addPoints(clientId, amount, transactionId) {
         const points = this.calculatePoints(amount);
         try {
-            const response = await axios.post(`${this.apiUrl}/loyalty/${clientId}/points/add`, {
+            const response = await axios.post(`${this.apiUrl}/loyalty/cards/${clientId}/points`, {
                 points,
                 amount,
                 transactionId,
@@ -74,10 +68,9 @@ class LoyaltyService {
         }
     }
 
-    // Utiliser des points pour une récompense
     async redeemPoints(clientId, rewardId, pointsToRedeem) {
         try {
-            const response = await axios.post(`${this.apiUrl}/loyalty/${clientId}/points/redeem`, {
+            const response = await axios.post(`${this.apiUrl}/loyalty/cards/${clientId}/redeem`, {
                 rewardId,
                 pointsToRedeem,
                 timestamp: new Date().toISOString()
@@ -89,10 +82,9 @@ class LoyaltyService {
         }
     }
 
-    // Obtenir l'historique des points
     async getPointsHistory(clientId) {
         try {
-            const response = await axios.get(`${this.apiUrl}/loyalty/${clientId}/history`);
+            const response = await axios.get(`${this.apiUrl}/loyalty/cards/${clientId}/history`);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la récupération de l\'historique:', error);
@@ -100,11 +92,10 @@ class LoyaltyService {
         }
     }
 
-    // Obtenir les récompenses disponibles
     async getAvailableRewards(clientId = null) {
         try {
             const url = clientId 
-                ? `${this.apiUrl}/loyalty/${clientId}/rewards`
+                ? `${this.apiUrl}/loyalty/rewards?clientId=${clientId}`
                 : `${this.apiUrl}/loyalty/rewards`;
             const response = await axios.get(url);
             return response.data;
@@ -114,10 +105,9 @@ class LoyaltyService {
         }
     }
 
-    // Vérifier le niveau de fidélité
     async checkLoyaltyTier(clientId) {
         try {
-            const response = await axios.get(`${this.apiUrl}/loyalty/${clientId}/tier`);
+            const response = await axios.get(`${this.apiUrl}/loyalty/cards/${clientId}/tier`);
             return response.data;
         } catch (error) {
             console.error('Erreur lors de la vérification du niveau:', error);
@@ -125,7 +115,6 @@ class LoyaltyService {
         }
     }
 
-    // Obtenir les statistiques de fidélité
     async getLoyaltyStats() {
         try {
             const response = await axios.get(`${this.apiUrl}/loyalty/stats`);
@@ -136,16 +125,14 @@ class LoyaltyService {
         }
     }
 
-    // Convertir des points en valeur monétaire
     convertPointsToGNF(points) {
         return points * this.pointValueInGNF;
     }
 
-    // Vérifier si une récompense est disponible pour le client
     async checkRewardAvailability(clientId, rewardId) {
         try {
             const response = await axios.get(
-                `${this.apiUrl}/loyalty/${clientId}/rewards/${rewardId}/availability`
+                `${this.apiUrl}/loyalty/rewards/${rewardId}/availability?clientId=${clientId}`
             );
             return response.data.available;
         } catch (error) {

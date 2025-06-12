@@ -63,8 +63,7 @@ app.use('/api/suppliers', require('./routes/suppliers'));
 app.use('/api/stock', require('./routes/stock'));
 
 // Clients routes
-app.use('/api/clients', require('./routes/clients'));
-
+app.use('/api/customers', require('./routes/customers'));
 // Categories routes
 app.use('/api/categories', require('./routes/categories'));
 

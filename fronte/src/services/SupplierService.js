@@ -2,200 +2,91 @@ import axios from 'axios';
 
 class SupplierService {
     constructor() {
-        this.apiUrl = process.env.REACT_APP_API_URL;
+        this.apiUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000/api';
+        this.config = {
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json'
+            }
+        };
     }
 
-    // Récupérer tous les fournisseurs
     async getAllSuppliers() {
         try {
-            const response = await axios.get(`${this.apiUrl}/suppliers`);
-            return response.data;
+            const response = await axios.get(`${this.apiUrl}/suppliers`, this.config);
+            return response.data.data || response.data;
         } catch (error) {
-            throw new Error('Erreur lors de la récupération des fournisseurs');
+            console.error('Error in getAllSuppliers:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to fetch suppliers');
         }
     }
 
-    // Récupérer un fournisseur par ID
-    async getSupplierById(supplierId) {
+    async getSupplierById(id) {
         try {
-            const response = await axios.get(`${this.apiUrl}/suppliers/${supplierId}`);
-            return response.data;
+            const response = await axios.get(`${this.apiUrl}/suppliers/${id}`, this.config);
+            return response.data.data || response.data;
         } catch (error) {
-            throw new Error('Erreur lors de la récupération du fournisseur');
+            console.error('Error in getSupplierById:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to fetch supplier');
         }
     }
 
-    // Créer un nouveau fournisseur
     async createSupplier(supplierData) {
         try {
-            const response = await axios.post(`${this.apiUrl}/suppliers`, supplierData);
-            return response.data;
+            const response = await axios.post(
+                `${this.apiUrl}/suppliers`, 
+                supplierData, 
+                this.config
+            );
+            return response.data.data || response.data;
         } catch (error) {
-            throw new Error('Erreur lors de la création du fournisseur');
+            console.error('Error in createSupplier:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to create supplier');
         }
     }
 
-    // Mettre à jour un fournisseur
-    async updateSupplier(supplierId, supplierData) {
+    async updateSupplier(id, supplierData) {
         try {
             const response = await axios.put(
-                `${this.apiUrl}/suppliers/${supplierId}`,
-                supplierData
+                `${this.apiUrl}/suppliers/${id}`,
+                supplierData,
+                this.config
             );
-            return response.data;
+            return response.data.data || response.data;
         } catch (error) {
-            throw new Error('Erreur lors de la mise à jour du fournisseur');
+            console.error('Error in updateSupplier:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to update supplier');
         }
     }
 
-    // Supprimer un fournisseur
-    async deleteSupplier(supplierId) {
+    async deleteSupplier(id) {
         try {
-            await axios.delete(`${this.apiUrl}/suppliers/${supplierId}`);
-            return true;
-        } catch (error) {
-            throw new Error('Erreur lors de la suppression du fournisseur');
-        }
-    }
-
-    // Créer une commande fournisseur
-    async createOrder(supplierId, orderData) {
-        try {
-            const response = await axios.post(
-                `${this.apiUrl}/suppliers/${supplierId}/orders`,
-                orderData
+            const response = await axios.delete(
+                `${this.apiUrl}/suppliers/${id}`,
+                this.config
             );
-            return response.data;
+            return response.data.data || response.data;
         } catch (error) {
-            console.error('Erreur lors de la création de la commande:', error);
-            throw error;
+            console.error('Error in deleteSupplier:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to delete supplier');
         }
     }
 
-    // Récupérer les commandes d'un fournisseur
-    async getSupplierOrders(supplierId) {
-        try {
-            const response = await axios.get(`${this.apiUrl}/suppliers/${supplierId}/orders`);
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la récupération des commandes:', error);
-            throw error;
-        }
-    }
-
-    // Mettre à jour le statut d'une commande
-    async updateOrderStatus(supplierId, orderId, status) {
-        try {
-            const response = await axios.put(
-                `${this.apiUrl}/suppliers/${supplierId}/orders/${orderId}/status`,
-                { status }
-            );
-            return response.data;
-        } catch (error) {
-            console.error('Erreur lors de la mise à jour du statut de la commande:', error);
-            throw error;
-        }
-    }
-
-    // Récupérer l'historique des paiements d'un fournisseur
-    async getPaymentHistory(supplierId) {
-        try {
-            const response = await axios.get(
-                `${this.apiUrl}/suppliers/${supplierId}/payments`
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de la récupération de l\'historique des paiements');
-        }
-    }
-
-    // Enregistrer un nouveau paiement
-    async recordPayment(supplierId, paymentData) {
-        try {
-            const response = await axios.post(
-                `${this.apiUrl}/suppliers/${supplierId}/payments`,
-                paymentData
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de l\'enregistrement du paiement');
-        }
-    }
-
-    // Mettre à jour un paiement
-    async updatePayment(supplierId, paymentId, paymentData) {
-        try {
-            const response = await axios.put(
-                `${this.apiUrl}/suppliers/${supplierId}/payments/${paymentId}`,
-                paymentData
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de la mise à jour du paiement');
-        }
-    }
-
-    // Supprimer un paiement
-    async deletePayment(supplierId, paymentId) {
-        try {
-            await axios.delete(
-                `${this.apiUrl}/suppliers/${supplierId}/payments/${paymentId}`
-            );
-            return true;
-        } catch (error) {
-            throw new Error('Erreur lors de la suppression du paiement');
-        }
-    }
-
-    // Envoyer un rappel de paiement
-    async sendPaymentReminder(supplierId, paymentId) {
-        try {
-            const response = await axios.post(
-                `${this.apiUrl}/suppliers/${supplierId}/payments/${paymentId}/reminder`
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de l\'envoi du rappel de paiement');
-        }
-    }
-
-    // Récupérer les statistiques de paiement d'un fournisseur
-    async getPaymentStats(supplierId) {
-        try {
-            const response = await axios.get(
-                `${this.apiUrl}/suppliers/${supplierId}/payment-stats`
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de la récupération des statistiques de paiement');
-        }
-    }
-
-    // Générer un rapport de paiements
-    async generatePaymentReport(supplierId, filters = {}) {
-        try {
-            const response = await axios.post(
-                `${this.apiUrl}/suppliers/${supplierId}/payment-report`,
-                filters
-            );
-            return response.data;
-        } catch (error) {
-            throw new Error('Erreur lors de la génération du rapport de paiements');
-        }
-    }
-
-    // Rechercher des fournisseurs
     async searchSuppliers(query) {
         try {
-            const response = await axios.get(`${this.apiUrl}/suppliers/search`, {
-                params: { q: query }
-            });
-            return response.data;
+            const response = await axios.get(
+                `${this.apiUrl}/suppliers/search`,
+                {
+                    ...this.config,
+                    params: { q: query }
+                }
+            );
+            return response.data.data || response.data;
         } catch (error) {
-            console.error('Erreur lors de la recherche des fournisseurs:', error);
-            throw error;
+            console.error('Error in searchSuppliers:', error.response?.data || error.message);
+            throw new Error(error.response?.data?.message || 'Failed to search suppliers');
         }
     }
 }
 
-export default new SupplierService(); 
+export default new SupplierService();
