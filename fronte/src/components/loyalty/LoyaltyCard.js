@@ -30,7 +30,7 @@ import {
     useTheme
 } from '@mui/material';
 import React, { useEffect, useState } from 'react';
-import LoyaltyService from '../../services/LoyaltyService';
+import LoyaltyService from '../../services/loyaltyService';
 
 const LoyaltyCard = ({ clientId }) => {
     const theme = useTheme();

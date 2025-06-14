@@ -47,21 +47,40 @@ import { useCart } from '../../../context/CartContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { productService } from '../../../services/productService';
 import { orderService } from '../../../services/orderService';
-import LoyaltyService from '../../../services/LoyaltyService';
+import { loyaltyService } from '../../../services/loyaltyService';
+import { useProductContext } from '../../../context/ProductContext';
 import Slider from 'react-slick';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 
+const scanLoyaltyCard = async () => {
+  return new Promise(resolve => {
+    setTimeout(() => {
+      resolve('CARD123456');
+    }, 1000);
+  });
+};
+
 const HomePage = () => {
   const navigate = useNavigate();
-  const { cartItems = [], addToCart } = useCart();
+  const { cartItems = [], addToCart, clearCart } = useCart();
   const queryClient = useQueryClient();
-  const totalCartAmount = cartItems.reduce((total, item) => total + (item.price * item.quantity), 0);
+  const productContext = useProductContext();
+  const newProductAdded = productContext?.newProductAdded;
+  const stockUpdated = productContext?.stockUpdated;
+  const clearNewProduct = productContext?.clearNewProduct;
+  const clearStockUpdate = productContext?.clearStockUpdate;
+  
+  const totalCartAmount = cartItems.reduce((total, item) => {
+    const itemPrice = item?.price || 0;
+    const itemQuantity = item?.quantity || 0;
+    return total + (itemPrice * itemQuantity);
+  }, 0);
+  
   const [searchTerm, setSearchTerm] = useState('');
   const [cartOpen, setCartOpen] = useState(false);
   const [activeTab, setActiveTab] = useState(0);
   const [loyaltyCard, setLoyaltyCard] = useState(null);
-  const [loyaltyCardLoading, setLoyaltyCardLoading] = useState(true);
   const [pointsToRedeem, setPointsToRedeem] = useState(0);
   const [showRedeemDialog, setShowRedeemDialog] = useState(false);
   const [notification, setNotification] = useState({
@@ -75,7 +94,6 @@ const HomePage = () => {
   const [paymentMethod, setPaymentMethod] = useState('orange_money');
   const [orderTotal, setOrderTotal] = useState(0);
 
-  // Afficher une notification
   const showNotification = (message, severity = 'info') => {
     setNotification({
       open: true,
@@ -84,30 +102,48 @@ const HomePage = () => {
     });
   };
 
-  // Charger la carte de fidélité au chargement
   useEffect(() => {
     const loadLoyaltyCard = async () => {
       try {
-        // Pour le moment, on utilise un ID client fixe pour le test
-        const customerId = 1; // À remplacer par la vraie authentification
-        const card = await LoyaltyService.getLoyaltyCard(customerId);
-        setLoyaltyCard(card);
+        const customerId = getCurrentCustomerId();
+        if (customerId) {
+          const card = await loyaltyService.getLoyaltyCard(customerId);
+          setLoyaltyCard(card);
+        }
       } catch (error) {
         console.error('Erreur lors du chargement de la carte de fidélité:', error);
-      } finally {
-        setLoyaltyCardLoading(false);
+        showNotification('Erreur lors du chargement de la carte de fidélité', 'error');
       }
     };
     loadLoyaltyCard();
   }, []);
 
+  useEffect(() => {
+    if (newProductAdded) {
+      showNotification(`Nouveau produit disponible: ${newProductAdded.nom}`, 'success');
+      clearNewProduct?.();
+    }
+  }, [newProductAdded, clearNewProduct]);
 
-  // Utilisation de React Query pour récupérer les produits
+  useEffect(() => {
+    if (stockUpdated) {
+      const cartItem = cartItems.find(item => item.id === stockUpdated.id);
+      if (cartItem && cartItem.quantity > stockUpdated.stock) {
+        showNotification(`Stock mis à jour pour ${stockUpdated.nom}. Nouveau stock: ${stockUpdated.stock}`, 'warning');
+      }
+      clearStockUpdate?.();
+    }
+  }, [stockUpdated, clearStockUpdate, cartItems]);
+
+  const getCurrentCustomerId = () => {
+    return localStorage.getItem('customerId') || null;
+  };
+
   const { data: products = [], isLoading } = useQuery({
     queryKey: ['products'],
     queryFn: productService.getAllProducts,
     retry: 2,
-    staleTime: 1000 * 60 * 5, // 5 minutes
+    staleTime: 1000 * 60 * 5,
     refetchOnWindowFocus: true,
     onError: (error) => {
       console.error('Erreur lors de la récupération des produits:', error);
@@ -115,38 +151,36 @@ const HomePage = () => {
     }
   });
 
-  // Effacer le cache des produits quand un nouveau produit est ajouté
-  const invalidateProductsCache = () => {
-    queryClient.invalidateQueries(['products']);
-  };
-
-  // Vérifier les mises à jour des produits toutes les 30 secondes
-  useEffect(() => {
-    const interval = setInterval(() => {
-      queryClient.refetchQueries(['products']);
-    }, 30000); // 30 secondes
-
-    return () => clearInterval(interval);
-  }, [queryClient]);
-
-  // Mock des promotions (à remplacer par une API réelle)
-  const promotions = [
-    {
-      id: 1,
-      title: 'Promo du mois',
-      description: '20% sur tous les produits frais',
-      image: '/promo1.jpg'
-    },
-    {
-      id: 2,
-      title: 'Offre spéciale',
-      description: 'Achetez 2, obtenez 1 gratuit',
-      image: '/promo2.jpg'
+  const { data: promotions = [], isLoading: promotionsLoading } = useQuery({
+    queryKey: ['promotions'],
+    queryFn: productService.getPromotionalProducts,
+    retry: 2,
+    staleTime: 1000 * 60 * 10,
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des promotions:', error);
     }
-  ];
+  });
 
-  const handleAddToCart = (product) => {
-    addToCart({ ...product, quantity: 1 });
+  const handleAddToCart = async (product) => {
+    if (!product || !product.nom || product.prix === undefined) {
+      showNotification('Erreur: Produit invalide', 'error');
+      return;
+    }
+    
+    if (product.stock <= 0) {
+      showNotification('Ce produit est en rupture de stock', 'error');
+      return;
+    }
+
+    addToCart({ 
+      id: product.id,
+      name: product.nom,
+      price: product.prix,
+      quantity: 1,
+      stock: product.stock
+    });
+    
+    showNotification(`${product.nom} ajouté au panier`, 'success');
   };
 
   const handleTabChange = (event, newValue) => {
@@ -158,21 +192,21 @@ const HomePage = () => {
   };
 
   const handleOrangeMoneyPayment = () => {
-    alert('Redirection vers Orange Money');
+    window.location.href = '/api/payment/orange-money';
   };
 
   const handleSplitPayment = () => {
-    alert('Option de paiement fractionné');
+    navigate('/payment/split');
   };
 
-  // Scanner la carte de fidélité
   const handleLoyaltyCardScan = async () => {
     try {
-      // Simuler le scan d'une carte
-      const scannedCard = await LoyaltyService.getLoyaltyCard(1); // À remplacer par le vrai scan
-      if (scannedCard) {
-        setLoyaltyCard(scannedCard);
+      const scannedCardId = await scanLoyaltyCard();
+      if (scannedCardId) {
+        const card = await loyaltyService.getLoyaltyCard(scannedCardId);
+        setLoyaltyCard(card);
         setShowRedeemDialog(true);
+        showNotification('Carte scannée avec succès', 'success');
       }
     } catch (error) {
       console.error('Erreur lors du scan de la carte:', error);
@@ -180,28 +214,23 @@ const HomePage = () => {
     }
   };
 
-  // Réduire les points
   const handleRedeemPoints = async () => {
     try {
       if (!loyaltyCard || pointsToRedeem <= 0) return;
 
-      // Vérifier si on a assez de points
       if (pointsToRedeem > loyaltyCard.points) {
         showNotification('Points insuffisants', 'error');
         return;
       }
 
-      // Appel API pour réduire les points
-      await LoyaltyService.redeemPoints(loyaltyCard.id, pointsToRedeem);
+      await loyaltyService.redeemPoints(loyaltyCard.id, pointsToRedeem);
       
-      // Mettre à jour la carte localement
       setLoyaltyCard({
         ...loyaltyCard,
         points: loyaltyCard.points - pointsToRedeem
       });
       
-      // Afficher une notification de succès
-      showNotification(`Points réduits avec succès. Nouveau total: ${loyaltyCard.points - pointsToRedeem} points`, 'success');
+      showNotification(`${pointsToRedeem} points réduits avec succès`, 'success');
       
       setShowRedeemDialog(false);
       setPointsToRedeem(0);
@@ -211,18 +240,16 @@ const HomePage = () => {
     }
   };
 
-  // Mutation pour créer une commande
   const createOrderMutation = useMutation({
     mutationFn: (orderData) => orderService.createOrder(orderData),
     onSuccess: (data) => {
       showNotification('Commande créée avec succès', 'success');
-      // Vider le panier après la commande
-      addToCart([]);
-      // Réinitialiser les champs
+      clearCart();
       setDeliveryAddress('');
       setDeliveryDistance(0);
       setDeliveryFee(0);
       setPaymentMethod('orange_money');
+      navigate('/order-confirmation');
     },
     onError: (error) => {
       showNotification('Erreur lors de la création de la commande', 'error');
@@ -246,56 +273,69 @@ const HomePage = () => {
       return;
     }
 
+    const customerId = getCurrentCustomerId();
+    if (!customerId) {
+      showNotification('Veuillez vous connecter pour passer commande', 'error');
+      navigate('/login');
+      return;
+    }
+
     const orderData = {
-      clientId: 1, // À remplacer par l'ID du client connecté
+      clientId: customerId,
       deliveryAddress,
       deliveryDistance,
       paymentMethod,
       items: cartItems.map(item => ({
-        productId: item.product.id,
-        quantity: item.quantity
+        productId: item.id,
+        quantity: item.quantity || 1
       }))
     };
 
     createOrderMutation.mutate(orderData);
   };
 
-  // Filtrage des produits en fonction de la recherche et de la catégorie active
-  const filteredProducts = (Array.isArray(products) ? products : []).filter(product => {
-    const matchesSearch = product.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      product.description.toLowerCase().includes(searchTerm.toLowerCase());
-    
-    const matchesCategory = activeTab === 0 || // Tous les produits
-      (activeTab === 1 && product.category === 'Alimentation') ||
-      (activeTab === 2 && product.category === 'Boissons') ||
-      (activeTab === 3 && product.category === 'Produits Frais');
-    
-    // Gérer les produits saisonniers et promotions
-    const isSeasonal = product.isSeasonal && 
-      new Date(product.seasonStart) <= new Date() &&
-      new Date(product.seasonEnd) >= new Date();
-    
-    const isOnPromotion = product.hasPromotion && 
-      new Date(product.promotionStart) <= new Date() &&
-      new Date(product.promotionEnd) >= new Date();
-    
-    return matchesSearch && matchesCategory && (!product.isSeasonal || isSeasonal) && (!product.hasPromotion || isOnPromotion);
-  });
-
-  // Calcul sécurisé du total
-  const calculateTotal = () => {
-    const subtotal = cartItems.reduce((total, item) => total + (item.product.price * item.quantity), 0);
-    setOrderTotal(subtotal + deliveryFee);
-    return subtotal + deliveryFee;
+  const formatPrice = (price) => {
+    if (price === undefined || price === null || isNaN(price)) {
+      return '0';
+    }
+    return new Intl.NumberFormat('fr-FR', {
+      style: 'currency',
+      currency: 'GNF'
+    }).format(price);
   };
 
+  const filteredProducts = (Array.isArray(products) ? products : []).filter(product => {
+    if (!product || typeof product !== 'object') return false;
+
+    const productName = product.nom || '';
+    const productDescription = product.description || '';
+    
+    const matchesSearch = productName.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      productDescription.toLowerCase().includes(searchTerm.toLowerCase());
+    
+    const isSeasonal = product.saison && 
+      product.date_debut_saison && product.date_fin_saison &&
+      new Date(product.date_debut_saison) <= new Date() &&
+      new Date(product.date_fin_saison) >= new Date();
+    
+    const isOnPromotion = product.promotion && 
+      product.date_debut_promo && product.date_fin_promo &&
+      new Date(product.date_debut_promo) <= new Date() &&
+      new Date(product.date_fin_promo) >= new Date();
+    
+    return matchesSearch;
+  });
+
   if (isLoading) {
-    return <CircularProgress />;
+    return (
+      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '100vh' }}>
+        <CircularProgress />
+      </Box>
+    );
   }
 
   return (
     <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      {/* Header */}
       <AppBar position="static" color="primary">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
@@ -327,9 +367,7 @@ const HomePage = () => {
         </Box>
       </AppBar>
 
-      {/* Main Content */}
       <Container maxWidth="lg" sx={{ py: 3, flex: 1 }}>
-        {/* Payment Methods Section */}
         <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
           <Typography variant="h6" gutterBottom>
             Options de Paiement
@@ -372,17 +410,12 @@ const HomePage = () => {
             </Grid>
           </Grid>
 
-          {/* Section Carte de Fidélité */}
           <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
             <Typography variant="h6" gutterBottom>
               Carte de Fidélité
             </Typography>
             
-            {loyaltyCardLoading ? (
-              <Box sx={{ display: 'flex', justifyContent: 'center', py: 2 }}>
-                <CircularProgress />
-              </Box>
-            ) : loyaltyCard ? (
+            {loyaltyCard ? (
               <Box>
                 <Grid container spacing={2}>
                   <Grid item xs={12} md={6}>
@@ -466,88 +499,46 @@ const HomePage = () => {
             )}
           </Box>
 
-          {/* Dialogue de réduction des points */}
-          <Dialog open={showRedeemDialog} onClose={() => setShowRedeemDialog(false)}>
-            <DialogTitle>Réduire des points</DialogTitle>
-            <DialogContent>
-              <Box sx={{ mt: 2 }}>
-                <TextField
-                  fullWidth
-                  label="Points à réduire"
-                  type="number"
-                  value={pointsToRedeem}
-                  onChange={(e) => setPointsToRedeem(parseInt(e.target.value) || 0)}
-                  InputProps={{
-                    endAdornment: <Typography>/{loyaltyCard?.points || 0}</Typography>
-                  }}
-                />
-              </Box>
-            </DialogContent>
-            <DialogActions>
-              <Button onClick={() => setShowRedeemDialog(false)}>Annuler</Button>
-              <Button onClick={handleRedeemPoints} variant="contained" color="primary">
-                Réduire
-              </Button>
-            </DialogActions>
-          </Dialog>
-
-          {/* Notification */}
-          <Snackbar
-            open={notification.open}
-            autoHideDuration={6000}
-            onClose={() => setNotification({ ...notification, open: false })}
-          >
-            <Alert
-              onClose={() => setNotification({ ...notification, open: false })}
-              severity={notification.severity}
-              sx={{ width: '100%' }}
-            >
-              {notification.message}
-            </Alert>
-          </Snackbar>
-
-          {/* Section Paiement */}
           <Box sx={{ mt: 3 }}>
             <Typography variant="h6" gutterBottom>
-              Total à payer: {totalCartAmount} GNF
+              Total à payer: {formatPrice(totalCartAmount)} GNF
             </Typography>
             <Button
               fullWidth
               variant="contained"
               color="primary"
-              onClick={() => navigate('/checkout')}
+              onClick={handleCheckout}
               sx={{ mt: 2 }}
+              disabled={cartItems.length === 0}
             >
               Passer à la caisse
             </Button>
           </Box>
         </Paper>
 
+        {!promotionsLoading && promotions.length > 0 && (
+          <Box sx={{ mb: 3 }}>
+            <Slider {...{
+              dots: true,
+              infinite: true,
+              speed: 500,
+              slidesToShow: 1,
+              slidesToScroll: 1,
+              autoplay: true,
+              autoplaySpeed: 5000
+            }}>
+              {promotions.map(promo => (
+                <Box key={promo.id} sx={{ p: 1 }}>
+                  <Paper sx={{ p: 2, textAlign: 'center', height: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+                    <Typography variant="h6">{promo.title}</Typography>
+                    <Typography variant="body1">{promo.description}</Typography>
+                  </Paper>
+                </Box>
+              ))}
+            </Slider>
+          </Box>
+        )}
 
-
-        {/* Promotions Slider */}
-        <Box sx={{ mb: 3 }}>
-          <Slider {...{
-            dots: true,
-            infinite: true,
-            speed: 500,
-            slidesToShow: 1,
-            slidesToScroll: 1,
-            autoplay: true,
-            autoplaySpeed: 5000
-          }}>
-            {promotions.map(promo => (
-              <Box key={promo.id} sx={{ p: 1 }}>
-                <Paper sx={{ p: 2, textAlign: 'center', height: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                  <Typography variant="h6">{promo.title}</Typography>
-                  <Typography variant="body1">{promo.description}</Typography>
-                </Paper>
-              </Box>
-            ))}
-          </Slider>
-        </Box>
-
-        {/* Products Section */}
         <Box sx={{ mb: 2 }}>
           <Typography variant="h5" gutterBottom>
             Produits Disponibles
@@ -555,65 +546,108 @@ const HomePage = () => {
           
           <Tabs value={activeTab} onChange={handleTabChange} aria-label="product categories">
             <Tab label="Tous" />
-            <Tab label="Alimentation" />
             <Tab label="Boissons" />
-            <Tab label="Produits Frais" />
+            <Tab label="Produits Laitiers" />
+            <Tab label="Fruits et Légumes" />
           </Tabs>
         </Box>
 
-        <Grid container spacing={3}>
-          {filteredProducts.map((product) => (
-            <Grid item xs={12} sm={6} md={4} lg={3} key={product.id}>
-              <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
-                {product.promotion && (
-                  <Chip
-                    label="PROMO"
-                    color="secondary"
-                    size="small"
-                    sx={{ position: 'absolute', m: 1, zIndex: 1 }}
-                  />
-                )}
-                
-                <CardMedia
-                  component="img"
-                  height="140"
-                  image={product.image}
-                  alt={product.name}
-                  onError={(e) => {
-                    e.target.src = 'https://via.placeholder.com/300x140?text=Produit';
-                  }}
-                />
-                
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Typography gutterBottom variant="h6" component="h3">
-                    {product.name}
-                  </Typography>
-                  
-                  <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                    {product.description}
-                  </Typography>
-                  
-                  <Typography variant="h6" color="primary" sx={{ mb: 1 }}>
-                    {product.price.toLocaleString()} GNF
-                  </Typography>
-                  
-                  <Button
-                    variant="contained"
-                    startIcon={<CartIcon />}
-                    onClick={() => handleAddToCart(product)}
-                    fullWidth
-                    disabled={product.stock === 0}
-                  >
-                    {product.stock === 0 ? 'Rupture de stock' : 'Ajouter au panier'}
-                  </Button>
-                </CardContent>
-              </Card>
-            </Grid>
-          ))}
-        </Grid>
+        {filteredProducts.length === 0 ? (
+          <Box sx={{ textAlign: 'center', py: 4 }}>
+            <Typography variant="h6" color="textSecondary">
+              Aucun produit trouvé
+            </Typography>
+            <Typography variant="body2" color="textSecondary">
+              Essayez de modifier vos critères de recherche ou de changer de catégorie.
+            </Typography>
+          </Box>
+        ) : (
+          <Grid container spacing={3}>
+            {filteredProducts.map((product) => {
+              
+              const isPromo = product.promotion && 
+                new Date(product.date_debut_promo) <= new Date() && 
+                new Date(product.date_fin_promo) >= new Date();
+              
+              const promoPrice = isPromo 
+                ? product.type_promotion === 'percentage'
+                  ? product.prix * (1 - product.valeur_promotion / 100)
+                  : product.prix - product.valeur_promotion
+                : null;
+
+              return (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={product.id || Math.random()}>
+                  <Card sx={{ height: '100%', display: 'flex', flexDirection: 'column' }}>
+                    {isPromo && (
+                      <Chip
+                        label="PROMO"
+                        color="secondary"
+                        size="small"
+                        sx={{ position: 'absolute', m: 1, zIndex: 1 }}
+                      />
+                    )}
+                    
+                    <CardMedia
+                      component="img"
+                      height="140"
+                      image={product.image || '/placeholder-product.png'}
+                      alt={product.nom || 'Produit'}
+                      onError={(e) => {
+                        e.target.src = '/placeholder-product.png';
+                      }}
+                    />
+                    
+                    <CardContent sx={{ flexGrow: 1 }}>
+                      <Typography gutterBottom variant="h6" component="h3">
+                        {product.nom || 'Nom non disponible'}
+                      </Typography>
+                      
+                      <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                        {product.description || 'Description non disponible'}
+                      </Typography>
+                      
+                      <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                        {isPromo ? (
+                          <>
+                            <Typography sx={{ textDecoration: 'line-through', color: 'text.disabled' }}>
+                              {formatPrice(product.prix)}
+                            </Typography>
+                            <Typography color="error" fontWeight="bold">
+                              {formatPrice(promoPrice)}
+                            </Typography>
+                          </>
+                        ) : (
+                          <Typography variant="h6" color="primary">
+                            {formatPrice(product.prix)}
+                          </Typography>
+                        )}
+                      </Box>
+                      
+                      {product.stock > 0 && product.stock <= 5 && (
+                        <Typography variant="caption" color="warning.main" sx={{ display: 'block', mb: 1 }}>
+                          Plus que {product.stock} en stock
+                        </Typography>
+                      )}
+                      
+                      <Button
+                        variant="contained"
+                        startIcon={<CartIcon />}
+                        onClick={() => handleAddToCart(product)}
+                        fullWidth
+                        disabled={product.stock === 0}
+                        sx={{ mt: 1 }}
+                      >
+                        {product.stock === 0 ? 'Rupture de stock' : 'Ajouter au panier'}
+                      </Button>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
+          </Grid>
+        )}
       </Container>
 
-      {/* Cart Drawer */}
       <Drawer anchor="right" open={cartOpen} onClose={handleCartToggle}>
         <Box sx={{ width: 350, p: 2 }}>
           <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
@@ -630,14 +664,14 @@ const HomePage = () => {
           ) : (
             <>
               <List>
-                {cartItems.map((item) => (
-                  <ListItem key={item.id}>
+                {cartItems.map((item, index) => (
+                  <ListItem key={item.id || index}>
                     <ListItemText
-                      primary={item.name}
-                      secondary={`${item.quantity} x ${item.price?.toLocaleString() || 0} GNF`}
+                      primary={item.name || 'Produit'}
+                      secondary={`${item.quantity || 1} x ${formatPrice(item.price)} GNF`}
                     />
                     <Typography>
-                      {((item.price || 0) * (item.quantity || 0)).toLocaleString()} GNF
+                      {formatPrice((item.price || 0) * (item.quantity || 1))} GNF
                     </Typography>
                   </ListItem>
                 ))}
@@ -646,7 +680,7 @@ const HomePage = () => {
               <Divider sx={{ my: 2 }} />
               
               <Typography variant="h6" sx={{ mb: 2 }}>
-                Total: {totalCartAmount.toLocaleString()} GNF
+                Total: {formatPrice(totalCartAmount)} GNF
               </Typography>
               
               <Button
@@ -674,11 +708,52 @@ const HomePage = () => {
         </Box>
       </Drawer>
 
-      {/* Footer */}
+      <Dialog open={showRedeemDialog} onClose={() => setShowRedeemDialog(false)}>
+        <DialogTitle>Réduire des points</DialogTitle>
+        <DialogContent>
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Points à réduire"
+              type="number"
+              value={pointsToRedeem}
+              onChange={(e) => setPointsToRedeem(parseInt(e.target.value) || 0)}
+              inputProps={{ min: 0, max: loyaltyCard?.points || 0 }}
+              helperText={`Points disponibles: ${loyaltyCard?.points || 0}`}
+            />
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowRedeemDialog(false)}>Annuler</Button>
+          <Button 
+            onClick={handleRedeemPoints} 
+            variant="contained" 
+            color="primary"
+            disabled={pointsToRedeem <= 0 || pointsToRedeem > (loyaltyCard?.points || 0)}
+          >
+            Réduire
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      <Snackbar
+        open={notification.open}
+        autoHideDuration={6000}
+        onClose={() => setNotification({ ...notification, open: false })}
+      >
+        <Alert
+          onClose={() => setNotification({ ...notification, open: false })}
+          severity={notification.severity}
+          sx={{ width: '100%' }}
+        >
+          {notification.message}
+        </Alert>
+      </Snackbar>
+
       <Box component="footer" sx={{ bgcolor: 'primary.main', color: 'white', p: 2, mt: 'auto' }}>
         <Container maxWidth="lg">
           <Typography variant="body2" align="center">
-            2023 App Superette - Tous droits réservés
+            {new Date().getFullYear()} App Superette - Tous droits réservés
           </Typography>
         </Container>
       </Box>

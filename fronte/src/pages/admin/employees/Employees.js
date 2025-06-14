@@ -2,8 +2,6 @@ import {
   Add as AddIcon,
   Delete as DeleteIcon,
   Edit as EditIcon,
-  LockReset as LockResetIcon,
-  Schedule as ScheduleIcon,
   Search as SearchIcon
 } from '@mui/icons-material';
 import {
@@ -19,7 +17,6 @@ import {
   DialogContent,
   DialogTitle,
   FormControl,
-  FormControlLabel,
   Grid,
   IconButton,
   InputLabel,
@@ -29,7 +26,6 @@ import {
   Snackbar,
   Stack,
   Switch,
-  Tab,
   Table,
   TableBody,
   TableCell,
@@ -37,100 +33,86 @@ import {
   TableHead,
   TablePagination,
   TableRow,
-  Tabs,
   TextField,
   Tooltip,
   Typography
 } from '@mui/material';
-import { LocalizationProvider, TimePicker } from '@mui/x-date-pickers';
 import React, { useEffect, useState } from 'react';
-import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import axios from 'axios';
-import { format } from 'date-fns';
-import { fr } from 'date-fns/locale';
 
 const API_URL = 'http://localhost:5000/api';
 
-const SYSTEM_ROLES = {
-  ADMIN: {
-    name: 'Administrateur',
-    permissions: [
-      'gestion_employes', 
-      'gestion_stock', 
-      'gestion_ventes', 
-      'gestion_clients', 
-      'rapports',
-      'configuration'
-    ],
-    color: 'error'
+// Service pour gérer les employés
+const EmployeeService = {
+  getAll: async () => {
+    try {
+      const response = await axios.get(`${API_URL}/employees`);
+      // Assurez-vous que la réponse contient un tableau
+      const data = response.data;
+      if (Array.isArray(data)) {
+        return data;
+      } else if (data && Array.isArray(data.employees)) {
+        return data.employees;
+      } else if (data && Array.isArray(data.data)) {
+        return data.data;
+      } else {
+        console.warn('Format de données inattendu:', data);
+        return [];
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des employés:', error);
+      throw new Error(error.response?.data?.message || 'Erreur lors de la récupération des employés');
+    }
   },
-  MANAGER: {
-    name: 'Gérant',
-    permissions: [
-      'gestion_stock', 
-      'gestion_ventes', 
-      'gestion_clients', 
-      'rapports'
-    ],
-    color: 'warning'
+
+  create: async (employeeData) => {
+    try {
+      const response = await axios.post(`${API_URL}/employees`, employeeData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la création de l\'employé');
+    }
   },
-  CASHIER: {
-    name: 'Caissier',
-    permissions: [
-      'gestion_ventes', 
-      'gestion_clients'
-    ],
-    color: 'primary'
+
+  update: async (id, employeeData) => {
+    try {
+      const response = await axios.put(`${API_URL}/employees/${id}`, employeeData);
+      return response.data;
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la mise à jour de l\'employé');
+    }
   },
-  STOCK: {
-    name: 'Stockiste',
-    permissions: ['gestion_stock'],
-    color: 'success'
+
+  delete: async (id) => {
+    try {
+      await axios.delete(`${API_URL}/employees/${id}`);
+    } catch (error) {
+      throw new Error(error.response?.data?.message || 'Erreur lors de la suppression de l\'employé');
+    }
   }
 };
 
-const DAYS = [
-  { id: 'monday', name: 'Lundi' },
-  { id: 'tuesday', name: 'Mardi' },
-  { id: 'wednesday', name: 'Mercredi' },
-  { id: 'thursday', name: 'Jeudi' },
-  { id: 'friday', name: 'Vendredi' },
-  { id: 'saturday', name: 'Samedi' },
-  { id: 'sunday', name: 'Dimanche' }
-];
-
-const PERMISSIONS = [
-  { id: 'gestion_employes', name: 'Gestion des employés' },
-  { id: 'gestion_stock', name: 'Gestion du stock' },
-  { id: 'gestion_ventes', name: 'Gestion des ventes' },
-  { id: 'gestion_clients', name: 'Gestion des clients' },
-  { id: 'rapports', name: 'Consultation des rapports' },
-  { id: 'configuration', name: 'Configuration système' }
+// Rôles prédéfinis
+const ROLES = [
+  { id: 'ADMIN', name: 'Administrateur', color: 'error' },
+  { id: 'MANAGER', name: 'Gérant', color: 'warning' },
+  { id: 'CASHIER', name: 'Caissier', color: 'primary' },
+  { id: 'STOCK', name: 'Stockiste', color: 'success' }
 ];
 
 const Employees = () => {
+  // Initialisation explicite avec un tableau vide
   const [employees, setEmployees] = useState([]);
-  const [roles, setRoles] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
   const [rowsPerPage, setRowsPerPage] = useState(10);
   const [searchTerm, setSearchTerm] = useState('');
-  const [tabValue, setTabValue] = useState(0);
+  const [roleFilter, setRoleFilter] = useState('');
   
   const [employeeDialog, setEmployeeDialog] = useState({
     open: false,
     mode: 'create',
     employee: null
-  });
-  
-  const [scheduleDialog, setScheduleDialog] = useState({
-    open: false,
-    employee: null
-  });
-  
-  const [roleDialog, setRoleDialog] = useState({
-    open: false,
-    role: null
   });
   
   const [employeeForm, setEmployeeForm] = useState({
@@ -142,18 +124,6 @@ const Employees = () => {
     status: 'active'
   });
   
-  const [scheduleForm, setScheduleForm] = useState(
-    DAYS.reduce((acc, day) => ({
-      ...acc,
-      [day.id]: { start: '09:00', end: '17:00', active: true }
-    }), {})
-  );
-  
-  const [roleForm, setRoleForm] = useState({
-    name: '',
-    permissions: []
-  });
-  
   const [snackbar, setSnackbar] = useState({
     open: false,
     message: '',
@@ -163,147 +133,62 @@ const Employees = () => {
   // API Services
   const fetchEmployees = async () => {
     try {
-      const response = await axios.get(`${API_URL}/employees`);
-      return response.data.data;
+      return await EmployeeService.getAll();
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors du chargement des employés';
-      throw new Error(errorMsg);
+      throw new Error(error.message);
     }
   };
 
-  const fetchRoles = async () => {
-  try {
-    const response = await axios.get(`${API_URL}/roles`, {
-      headers: {
-        'Accept': 'application/json',
-        'Content-Type': 'application/json'
-      },
-      params: {
-        page: 1,
-        limit: 100
-      }
-    });
-    
-    if (response.data && response.data.success) {
-      return response.data.data.map(role => ({
-        ...role,
-        permissions: Array.isArray(role.permissions) ? role.permissions : []
-      }));
-    }
-    throw new Error('Format de réponse inattendu');
-  } catch (error) {
-    const errorMsg = error.response?.data?.message || 
-                    error.message || 
-                    'Erreur lors du chargement des rôles';
-    throw new Error(errorMsg);
-  }
-};
-
   const createEmployee = async (employeeData) => {
     try {
-      const response = await axios.post(`${API_URL}/employees`, employeeData);
-      return response.data.data;
+      return await EmployeeService.create(employeeData);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la création de l\'employé';
-      throw new Error(errorMsg);
+      throw new Error(error.message);
     }
   };
 
   const updateEmployee = async (id, employeeData) => {
     try {
-      const response = await axios.put(`${API_URL}/employees/${id}`, employeeData);
-      return response.data.data;
+      return await EmployeeService.update(id, employeeData);
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la mise à jour de l\'employé';
-      throw new Error(errorMsg);
+      throw new Error(error.message);
     }
   };
 
   const deleteEmployee = async (id) => {
     try {
-      await axios.delete(`${API_URL}/employees/${id}`);
+      await EmployeeService.delete(id);
       return true;
     } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la suppression de l\'employé';
-      throw new Error(errorMsg);
+      throw new Error(error.message);
     }
   };
 
-  const updateEmployeeSchedule = async (id, schedule) => {
-    try {
-      const response = await axios.put(`${API_URL}/employees/${id}/schedule`, { schedule });
-      return response.data.data;
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la mise à jour des horaires';
-      throw new Error(errorMsg);
-    }
-  };
-
-  const createRole = async (roleData) => {
-    try {
-      const response = await axios.post(`${API_URL}/roles`, {
-        name: roleData.name,
-        permissions: roleData.permissions
-      });
-      return response.data.data;
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la création du rôle';
-      throw new Error(errorMsg);
-    }
-  };
-
-  const updateRole = async (id, roleData) => {
-    try {
-      const response = await axios.put(`${API_URL}/roles/${id}`, {
-        name: roleData.name,
-        permissions: roleData.permissions
-      });
-      return response.data.data;
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la mise à jour du rôle';
-      throw new Error(errorMsg);
-    }
-  };
-
-  const deleteRole = async (id) => {
-    try {
-      await axios.delete(`${API_URL}/roles/${id}`);
-      return true;
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la suppression du rôle';
-      throw new Error(errorMsg);
-    }
-  };
-
-  const resetPassword = async (id) => {
-    try {
-      await axios.post(`${API_URL}/employees/${id}/reset-password`);
-      return true;
-    } catch (error) {
-      const errorMsg = error.response?.data?.message || 'Erreur lors de la réinitialisation du mot de passe';
-      throw new Error(errorMsg);
-    }
-  };
-
-  // Load data on mount
+  // Charger les données au montage du composant
   useEffect(() => {
-    const loadData = async () => {
+    const loadEmployees = async () => {
       try {
         setLoading(true);
-        const [employeesData, rolesData] = await Promise.all([
-          fetchEmployees(),
-          fetchRoles()
-        ]);
-        setEmployees(employeesData);
-        setRoles(rolesData);
+        const employeesData = await fetchEmployees();
+        
+        // Vérification supplémentaire que les données sont bien un tableau
+        if (Array.isArray(employeesData)) {
+          setEmployees(employeesData);
+        } else {
+          console.error('Les données reçues ne sont pas un tableau:', employeesData);
+          setEmployees([]);
+          showSnackbar('Format de données incorrect reçu du serveur', 'error');
+        }
       } catch (error) {
+        console.error('Erreur lors du chargement des employés:', error);
         showSnackbar(error.message, 'error');
+        setEmployees([]); // S'assurer que employees reste un tableau même en cas d'erreur
       } finally {
         setLoading(false);
       }
     };
     
-    loadData();
+    loadEmployees();
   }, []);
 
   // Helper functions
@@ -317,19 +202,29 @@ const Employees = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'Jamais';
-    return format(new Date(dateString), 'PPpp', { locale: fr });
+    return new Date(dateString).toLocaleDateString('fr-FR', {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit'
+    });
   };
 
-  // Employee CRUD operations
+  const getRoleInfo = (roleId) => {
+    return ROLES.find(r => r.id === roleId) || { name: roleId || 'Non défini', color: 'default' };
+  };
+
+  // Gestion des employés
   const handleOpenEmployeeDialog = (employee = null) => {
     if (employee) {
       setEmployeeForm({
-        firstName: employee.firstName,
-        lastName: employee.lastName,
-        email: employee.email,
-        phone: employee.phone,
-        role: employee.role,
-        status: employee.status
+        firstName: employee.firstName || '',
+        lastName: employee.lastName || '',
+        email: employee.email || '',
+        phone: employee.phone || '',
+        role: employee.role || '',
+        status: employee.status || 'active'
       });
       setEmployeeDialog({ open: true, mode: 'edit', employee });
     } else {
@@ -347,6 +242,14 @@ const Employees = () => {
 
   const handleCloseEmployeeDialog = () => {
     setEmployeeDialog({ open: false, mode: 'create', employee: null });
+    setEmployeeForm({
+      firstName: '',
+      lastName: '',
+      email: '',
+      phone: '',
+      role: '',
+      status: 'active'
+    });
   };
 
   const handleEmployeeFormChange = (e) => {
@@ -356,33 +259,54 @@ const Employees = () => {
 
   const handleSaveEmployee = async () => {
     try {
-      if (!employeeForm.firstName || !employeeForm.lastName || !employeeForm.email || !employeeForm.role) {
-        throw new Error('Veuillez remplir tous les champs obligatoires');
+      // Validation
+      if (!employeeForm.firstName?.trim()) {
+        throw new Error('Le prénom est obligatoire');
+      }
+      if (!employeeForm.lastName?.trim()) {
+        throw new Error('Le nom est obligatoire');
+      }
+      if (!employeeForm.email?.trim()) {
+        throw new Error('L\'email est obligatoire');
+      }
+      if (!employeeForm.role) {
+        throw new Error('Le rôle est obligatoire');
       }
 
       const employeeData = {
-        firstName: employeeForm.firstName,
-        lastName: employeeForm.lastName,
-        email: employeeForm.email,
-        phone: employeeForm.phone || null,
+        firstName: employeeForm.firstName.trim(),
+        lastName: employeeForm.lastName.trim(),
+        email: employeeForm.email.trim(),
+        phone: employeeForm.phone?.trim() || null,
         role: employeeForm.role,
-        status: employeeForm.status || 'active',
-        avatar: employeeForm.avatar || '/avatars/default.jpg'
+        status: employeeForm.status
       };
 
       if (employeeDialog.mode === 'create') {
-        employeeData.password = Math.random().toString(36).slice(-8);
         const createdEmployee = await createEmployee(employeeData);
-        setEmployees(prev => [...prev, createdEmployee]);
+        setEmployees(prev => {
+          // Vérification que prev est bien un tableau
+          if (Array.isArray(prev)) {
+            return [...prev, createdEmployee];
+          } else {
+            console.error('employees n\'est pas un tableau lors de l\'ajout');
+            return [createdEmployee];
+          }
+        });
         showSnackbar('Employé créé avec succès');
       } else {
-        const updatedEmployee = await updateEmployee(
-          employeeDialog.employee.id, 
-          employeeData
-        );
-        setEmployees(prev => prev.map(e => 
-          e.id === employeeDialog.employee.id ? updatedEmployee : e
-        ));
+        const updatedEmployee = await updateEmployee(employeeDialog.employee.id, employeeData);
+        setEmployees(prev => {
+          // Vérification que prev est bien un tableau
+          if (Array.isArray(prev)) {
+            return prev.map(e => 
+              e.id === employeeDialog.employee.id ? updatedEmployee : e
+            );
+          } else {
+            console.error('employees n\'est pas un tableau lors de la mise à jour');
+            return [updatedEmployee];
+          }
+        });
         showSnackbar('Employé mis à jour avec succès');
       }
 
@@ -392,154 +316,58 @@ const Employees = () => {
     }
   };
 
-  const handleDeleteEmployee = async (id) => {
+  const handleDeleteEmployee = async (employee) => {
+    if (!window.confirm(`Êtes-vous sûr de vouloir supprimer ${employee.firstName} ${employee.lastName} ?`)) {
+      return;
+    }
+
     try {
-      await deleteEmployee(id);
-      setEmployees(prev => prev.filter(e => e.id !== id));
+      await deleteEmployee(employee.id);
+      setEmployees(prev => {
+        // Vérification que prev est bien un tableau
+        if (Array.isArray(prev)) {
+          return prev.filter(e => e.id !== employee.id);
+        } else {
+          console.error('employees n\'est pas un tableau lors de la suppression');
+          return [];
+        }
+      });
       showSnackbar('Employé supprimé avec succès');
     } catch (error) {
       showSnackbar(error.message, 'error');
     }
   };
 
-  // Schedule management
-  const handleOpenScheduleDialog = (employee) => {
-    setScheduleForm(employee.schedule || 
-      DAYS.reduce((acc, day) => ({
-        ...acc,
-        [day.id]: { start: '09:00', end: '17:00', active: true }
-      }), {})
-    );
-    setScheduleDialog({ open: true, employee });
-  };
+  // Filtrage et pagination - avec vérification de sécurité CORRIGÉE
+  const filteredEmployees = React.useMemo(() => {
+    // Vérification que employees est bien un tableau avant de filtrer
+    if (!Array.isArray(employees)) {
+      console.error('employees n\'est pas un tableau:', employees);
+      return [];
+    }
 
-  const handleCloseScheduleDialog = () => {
-    setScheduleDialog({ open: false, employee: null });
-  };
-
-  const handleScheduleChange = (day, field, value) => {
-    setScheduleForm(prev => ({
-      ...prev,
-      [day]: {
-        ...prev[day],
-        [field]: value
-      }
-    }));
-  };
-
-  const handleSaveSchedule = async () => {
-    try {
-      const updatedEmployee = await updateEmployeeSchedule(
-        scheduleDialog.employee.id,
-        scheduleForm
+    return employees.filter(employee => {
+      const searchLower = searchTerm.toLowerCase();
+      
+      // Vérification de sécurité pour chaque propriété avant toLowerCase()
+      const firstName = employee.firstName || '';
+      const lastName = employee.lastName || '';
+      const email = employee.email || '';
+      const roleInfo = getRoleInfo(employee.role);
+      const roleName = roleInfo.name || '';
+      
+      const matchesSearch = (
+        firstName.toLowerCase().includes(searchLower) ||
+        lastName.toLowerCase().includes(searchLower) ||
+        email.toLowerCase().includes(searchLower) ||
+        roleName.toLowerCase().includes(searchLower)
       );
       
-      setEmployees(prev => prev.map(e => 
-        e.id === scheduleDialog.employee.id ? updatedEmployee : e
-      ));
-      showSnackbar('Horaires mis à jour avec succès');
-      handleCloseScheduleDialog();
-    } catch (error) {
-      showSnackbar(error.message, 'error');
-    }
-  };
-
-  // Role management
-  const handleOpenRoleDialog = (role = null) => {
-    if (role) {
-      setRoleForm({
-        name: role.name,
-        permissions: Array.isArray(role.permissions) ? [...role.permissions] : []
-      });
-      setRoleDialog({ open: true, role });
-    } else {
-      setRoleForm({
-        name: '',
-        permissions: []
-      });
-      setRoleDialog({ open: true, role: null });
-    }
-  };
-
-  const handleCloseRoleDialog = () => {
-    setRoleDialog({ open: false, role: null });
-  };
-
-  const handleRoleFormChange = (e) => {
-    const { name, value } = e.target;
-    setRoleForm(prev => ({ ...prev, [name]: value }));
-  };
-
-  const handlePermissionToggle = (permission) => {
-    setRoleForm(prev => ({
-      ...prev,
-      permissions: prev.permissions.includes(permission)
-        ? prev.permissions.filter(p => p !== permission)
-        : [...prev.permissions, permission]
-    }));
-  };
-
-  const handleSaveRole = async () => {
-    try {
-      if (!roleForm.name) {
-        throw new Error('Le nom du rôle est obligatoire');
-      }
-
-      let savedRole;
-      if (roleDialog.role) {
-        if (Object.keys(SYSTEM_ROLES).includes(roleDialog.role.id)) {
-          throw new Error('Les rôles système ne peuvent pas être modifiés');
-        }
-        savedRole = await updateRole(roleDialog.role.id, roleForm);
-      } else {
-        savedRole = await createRole(roleForm);
-      }
-
-      const roles = await fetchRoles();
-      setRoles(roles);
+      const matchesRole = !roleFilter || employee.role === roleFilter;
       
-      showSnackbar('Rôle sauvegardé avec succès');
-      handleCloseRoleDialog();
-    } catch (error) {
-      showSnackbar(error.message, 'error');
-    }
-  };
-
-  const handleDeleteRole = async (roleId) => {
-    try {
-      if (Object.keys(SYSTEM_ROLES).includes(roleId)) {
-        throw new Error('Les rôles système ne peuvent pas être supprimés');
-      }
-      
-      await deleteRole(roleId);
-      const updatedRoles = await fetchRoles();
-      setRoles(updatedRoles);
-      showSnackbar('Rôle supprimé avec succès');
-    } catch (error) {
-      showSnackbar(error.message, 'error');
-    }
-  };
-
-  // Reset password
-  const handleResetPassword = async (employee) => {
-    try {
-      await resetPassword(employee.id);
-      showSnackbar(`Un lien de réinitialisation a été envoyé à ${employee.email}`);
-    } catch (error) {
-      showSnackbar('Erreur lors de la réinitialisation du mot de passe', 'error');
-    }
-  };
-
-  // Filter and pagination
-  const filteredEmployees = employees.filter(employee => {
-    const searchLower = searchTerm.toLowerCase();
-    return (
-      employee.firstName.toLowerCase().includes(searchLower) ||
-      employee.lastName.toLowerCase().includes(searchLower) ||
-      employee.email.toLowerCase().includes(searchLower) ||
-      (roles.find(r => r.id === employee.role)?.name || '').toLowerCase().includes(searchLower)
-    );
-  });
+      return matchesSearch && matchesRole;
+    });
+  }, [employees, searchTerm, roleFilter]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -550,554 +378,378 @@ const Employees = () => {
     setPage(0);
   };
 
-  const handleTabChange = (event, newValue) => {
-    setTabValue(newValue);
-  };
+  // Statistiques - avec vérifications de sécurité
+  const activeEmployees = Array.isArray(employees) ? 
+    employees.filter(e => e.status === 'active').length : 0;
+    
+  const lastLoginEmployee = Array.isArray(employees) && employees.length > 0 ? 
+    employees.reduce((latest, current) => 
+      new Date(current.lastLogin || 0) > new Date(latest.lastLogin || 0) ? current : latest
+    ) : null;
+
+  const uniqueRoles = Array.isArray(employees) ? 
+    new Set(employees.map(e => e.role)).size : 0;
 
   return (
-    <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={fr}>
-      <Box>
-        {/* Header */}
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-          <Typography variant="h4" component="h1">
-            Gestion des employés
-          </Typography>
-          <Button
-            variant="contained"
-            startIcon={<AddIcon />}
-            onClick={() => handleOpenEmployeeDialog()}
-          >
-            Ajouter un employé
-          </Button>
-        </Box>
+    <Box>
+      {/* Header */}
+      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+        <Typography variant="h4" component="h1">
+          Gestion des employés
+        </Typography>
+        <Button
+          variant="contained"
+          startIcon={<AddIcon />}
+          onClick={() => handleOpenEmployeeDialog()}
+        >
+          Ajouter un employé
+        </Button>
+      </Box>
 
-        {/* Statistics Cards */}
-        <Grid container spacing={3} sx={{ mb: 3 }}>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Total employés
-                </Typography>
-                <Typography variant="h4">
-                  {employees.length}
-                </Typography>
-              </CardContent>
-            </Card>
+      {/* Cartes statistiques */}
+      <Grid container spacing={3} sx={{ mb: 3 }}>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom variant="body2">
+                Total employés
+              </Typography>
+              <Typography variant="h4">
+                {Array.isArray(employees) ? employees.length : 0}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom variant="body2">
+                Employés actifs
+              </Typography>
+              <Typography variant="h4">
+                {activeEmployees}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom variant="body2">
+                Dernière connexion
+              </Typography>
+              <Typography variant="body1">
+                {lastLoginEmployee ? 
+                  `${lastLoginEmployee.firstName || ''} ${lastLoginEmployee.lastName || ''}`.trim() || 'Nom non défini' : 
+                  'Aucune'
+                }
+              </Typography>
+              <Typography variant="body2" color="textSecondary">
+                {lastLoginEmployee ? formatDate(lastLoginEmployee.lastLogin) : ''}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+        <Grid item xs={12} sm={6} md={3}>
+          <Card>
+            <CardContent>
+              <Typography color="textSecondary" gutterBottom variant="body2">
+                Rôles différents
+              </Typography>
+              <Typography variant="h4">
+                {uniqueRoles}
+              </Typography>
+            </CardContent>
+          </Card>
+        </Grid>
+      </Grid>
+
+      {/* Recherche et filtres */}
+      <Paper sx={{ p: 2, mb: 3 }}>
+        <Grid container spacing={2} alignItems="center">
+          <Grid item xs={12} md={8}>
+            <TextField
+              fullWidth
+              variant="outlined"
+              placeholder="Rechercher un employé (nom, prénom, email)..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              InputProps={{
+                startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
+              }}
+            />
           </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Employés actifs
-                </Typography>
-                <Typography variant="h4">
-                  {employees.filter(e => e.status === 'active').length}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Dernière connexion
-                </Typography>
-                <Typography variant="h4">
-                  {employees.length > 0 ? 
-                    formatDate(employees.sort((a, b) => 
-                      new Date(b.lastLogin) - new Date(a.lastLogin)
-                    )[0].lastLogin) : 'N/A'}
-                </Typography>
-              </CardContent>
-            </Card>
-          </Grid>
-          <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
-                <Typography color="textSecondary" gutterBottom>
-                  Rôles différents
-                </Typography>
-                <Typography variant="h4">
-                  {new Set(employees.map(e => e.role)).size}
-                </Typography>
-              </CardContent>
-            </Card>
+          <Grid item xs={12} md={4}>
+            <FormControl fullWidth>
+              <InputLabel>Filtrer par rôle</InputLabel>
+              <Select
+                value={roleFilter}
+                onChange={(e) => setRoleFilter(e.target.value)}
+                label="Filtrer par rôle"
+              >
+                <MenuItem value="">Tous les rôles</MenuItem>
+                {ROLES.map(role => (
+                  <MenuItem key={role.id} value={role.id}>
+                    {role.name}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
           </Grid>
         </Grid>
+      </Paper>
 
-        {/* Tabs */}
-        <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
-          <Tabs value={tabValue} onChange={handleTabChange}>
-            <Tab label="Employés" />
-            <Tab label="Rôles et permissions" />
-          </Tabs>
-        </Box>
-
-        {/* Tab Content */}
-        {tabValue === 0 ? (
-          <>
-            {/* Search and Filters */}
-            <Paper sx={{ p: 2, mb: 3 }}>
-              <Grid container spacing={2} alignItems="center">
-                <Grid item xs={12} md={8}>
-                  <TextField
-                    fullWidth
-                    variant="outlined"
-                    placeholder="Rechercher un employé..."
-                    value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
-                    InputProps={{
-                      startAdornment: <SearchIcon color="action" sx={{ mr: 1 }} />,
-                    }}
-                  />
-                </Grid>
-                <Grid item xs={12} md={4}>
-                  <FormControl fullWidth>
-                    <InputLabel>Filtrer par rôle</InputLabel>
-                    <Select
-                      value=""
-                      onChange={() => {}}
-                      label="Filtrer par rôle"
-                    >
-                      <MenuItem value="">Tous les rôles</MenuItem>
-                      {roles.map(role => (
-                        <MenuItem key={role.id} value={role.id}>
-                          {role.name}
-                        </MenuItem>
-                      ))}
-                    </Select>
-                  </FormControl>
-                </Grid>
-              </Grid>
-            </Paper>
-
-            {/* Employees Table */}
-            <Paper sx={{ width: '100%', overflow: 'hidden' }}>
-              <TableContainer>
-                <Table stickyHeader>
-                  <TableHead>
-                    <TableRow>
-                      <TableCell>Photo</TableCell>
-                      <TableCell>Nom</TableCell>
-                      <TableCell>Contact</TableCell>
-                      <TableCell>Rôle</TableCell>
-                      <TableCell>Statut</TableCell>
-                      <TableCell>Dernière connexion</TableCell>
-                      <TableCell align="center">Actions</TableCell>
-                    </TableRow>
-                  </TableHead>
-                  <TableBody>
-                    {loading ? (
-                      <TableRow>
-                        <TableCell colSpan={7} align="center">
-                          Chargement...
+      {/* Table des employés */}
+      <Paper sx={{ width: '100%', overflow: 'hidden' }}>
+        <TableContainer>
+          <Table stickyHeader>
+            <TableHead>
+              <TableRow>
+                <TableCell>Photo</TableCell>
+                <TableCell>Nom complet</TableCell>
+                <TableCell>Contact</TableCell>
+                <TableCell>Rôle</TableCell>
+                <TableCell>Statut</TableCell>
+                <TableCell>Dernière connexion</TableCell>
+                <TableCell align="center">Actions</TableCell>
+              </TableRow>
+            </TableHead>
+            <TableBody>
+              {loading ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    Chargement...
+                  </TableCell>
+                </TableRow>
+              ) : filteredEmployees.length === 0 ? (
+                <TableRow>
+                  <TableCell colSpan={7} align="center">
+                    {searchTerm || roleFilter ? 'Aucun employé trouvé avec ces critères' : 'Aucun employé'}
+                  </TableCell>
+                </TableRow>
+              ) : (
+                filteredEmployees
+                  .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
+                  .map((employee) => {
+                    const roleInfo = getRoleInfo(employee.role);
+                    return (
+                      <TableRow key={employee.id} hover>
+                        <TableCell>
+                          <Avatar 
+                            src={employee.avatar} 
+                            alt={`${employee.firstName || ''} ${employee.lastName || ''}`}
+                          >
+                            {(employee.firstName || '')[0]}{(employee.lastName || '')[0]}
+                          </Avatar>
+                        </TableCell>
+                        <TableCell>
+                          <Typography fontWeight="medium">
+                            {employee.firstName || ''} {employee.lastName || ''}
+                          </Typography>
+                          <Typography variant="body2" color="text.secondary">
+                            {employee.email || ''}
+                          </Typography>
+                        </TableCell>
+                        <TableCell>
+                          {employee.phone || 'Non renseigné'}
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={roleInfo.name}
+                            color={roleInfo.color}
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Chip 
+                            label={employee.status === 'active' ? 'Actif' : 'Inactif'} 
+                            color={employee.status === 'active' ? 'success' : 'error'} 
+                            size="small" 
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Typography variant="body2">
+                            {formatDate(employee.lastLogin)}
+                          </Typography>
+                        </TableCell>
+                        <TableCell align="center">
+                          <Stack direction="row" spacing={1} justifyContent="center">
+                            <Tooltip title="Modifier">
+                              <IconButton 
+                                onClick={() => handleOpenEmployeeDialog(employee)}
+                                size="small"
+                              >
+                                <EditIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                            <Tooltip title="Supprimer">
+                              <IconButton 
+                                onClick={() => handleDeleteEmployee(employee)}
+                                size="small"
+                                color="error"
+                              >
+                                <DeleteIcon fontSize="small" />
+                              </IconButton>
+                            </Tooltip>
+                          </Stack>
                         </TableCell>
                       </TableRow>
-                    ) : filteredEmployees.length === 0 ? (
-                      <TableRow>
-                        <TableCell colSpan={7} align="center">
-                          Aucun employé trouvé
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      filteredEmployees
-                        .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
-                        .map((employee) => (
-                          <TableRow key={employee.id} hover>
-                            <TableCell>
-                              <Avatar src={employee.avatar} alt={`${employee.firstName} ${employee.lastName}`} />
-                            </TableCell>
-                            <TableCell>
-                              <Typography fontWeight="medium">
-                                {employee.firstName} {employee.lastName}
-                              </Typography>
-                              <Typography variant="body2" color="text.secondary">
-                                {employee.email}
-                              </Typography>
-                            </TableCell>
-                            <TableCell>{employee.phone}</TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={roles.find(r => r.id === employee.role)?.name || employee.role} 
-                                color={SYSTEM_ROLES[employee.role]?.color || 'default'} 
-                                size="small" 
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Chip 
-                                label={employee.status === 'active' ? 'Actif' : 'Inactif'} 
-                                color={employee.status === 'active' ? 'success' : 'error'} 
-                                size="small" 
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {formatDate(employee.lastLogin)}
-                            </TableCell>
-                            <TableCell align="center">
-                              <Stack direction="row" spacing={1} justifyContent="center">
-                                <Tooltip title="Modifier">
-                                  <IconButton onClick={() => handleOpenEmployeeDialog(employee)}>
-                                    <EditIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Horaires">
-                                  <IconButton onClick={() => handleOpenScheduleDialog(employee)}>
-                                    <ScheduleIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Réinitialiser mot de passe">
-                                  <IconButton onClick={() => handleResetPassword(employee)}>
-                                    <LockResetIcon fontSize="small" />
-                                  </IconButton>
-                                </Tooltip>
-                                <Tooltip title="Supprimer">
-                                  <IconButton onClick={() => handleDeleteEmployee(employee.id)}>
-                                    <DeleteIcon fontSize="small" color="error" />
-                                  </IconButton>
-                                </Tooltip>
-                              </Stack>
-                            </TableCell>
-                          </TableRow>
-                        ))
-                    )}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-              <TablePagination
-                rowsPerPageOptions={[5, 10, 25]}
-                component="div"
-                count={filteredEmployees.length}
-                rowsPerPage={rowsPerPage}
-                page={page}
-                onPageChange={handleChangePage}
-                onRowsPerPageChange={handleChangeRowsPerPage}
-                labelRowsPerPage="Lignes par page"
-                labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
-              />
-            </Paper>
-          </>
-        ) : (
-          <>
-            {/* Roles and Permissions Tab */}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
-              <Button
-                variant="contained"
-                startIcon={<AddIcon />}
-                onClick={() => handleOpenRoleDialog()}
-              >
-                Créer un rôle
-              </Button>
-            </Box>
+                    );
+                  })
+              )}
+            </TableBody>
+          </Table>
+        </TableContainer>
+        <TablePagination
+          rowsPerPageOptions={[5, 10, 25, 50]}
+          component="div"
+          count={filteredEmployees.length}
+          rowsPerPage={rowsPerPage}
+          page={page}
+          onPageChange={handleChangePage}
+          onRowsPerPageChange={handleChangeRowsPerPage}
+          labelRowsPerPage="Lignes par page"
+          labelDisplayedRows={({ from, to, count }) => `${from}-${to} sur ${count}`}
+        />
+      </Paper>
 
-            <Grid container spacing={3}>
-              {roles.map((role) => (
-                <Grid item xs={12} sm={6} md={4} key={role.id}>
-                  <Card>
-                    <CardContent>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                        <Typography variant="h6">
-                          {role.name}
-                        </Typography>
-                        <Chip 
-                          label={`${employees.filter(e => e.role === role.id).length} employés`} 
-                          size="small" 
-                        />
-                      </Box>
-                      
-                      <Stack spacing={1} sx={{ mb: 2 }}>
-                        {(Array.isArray(role.permissions) ? role.permissions : []).map(permission => (
-                          <Chip
-                            key={permission}
-                            label={PERMISSIONS.find(p => p.id === permission)?.name || permission}
-                            size="small"
-                            variant="outlined"
-                          />
-                        ))}
-                      </Stack>
-
-                      <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1 }}>
-                        <Button
-                          size="small"
-                          startIcon={<EditIcon />}
-                          onClick={() => handleOpenRoleDialog(role)}
-                          disabled={Object.keys(SYSTEM_ROLES).includes(role.id)}
-                        >
-                          Modifier
-                        </Button>
-                        <Button
-                          size="small"
-                          startIcon={<DeleteIcon />}
-                          onClick={() => handleDeleteRole(role.id)}
-                          disabled={Object.keys(SYSTEM_ROLES).includes(role.id)}
-                          color="error"
-                        >
-                          Supprimer
-                        </Button>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
-              ))}
-            </Grid>
-          </>
-        )}
-
-        {/* Employee Dialog */}
-        <Dialog 
-          open={employeeDialog.open} 
-          onClose={handleCloseEmployeeDialog} 
-          maxWidth="md"
-          fullWidth
-        >
-          <DialogTitle>
-            {employeeDialog.mode === 'create' ? 'Nouvel employé' : `Modifier ${employeeDialog.employee?.firstName} ${employeeDialog.employee?.lastName}`}
-          </DialogTitle>
-          <DialogContent dividers>
-            <Grid container spacing={3}>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Prénom"
-                  name="firstName"
-                  value={employeeForm.firstName}
-                  onChange={handleEmployeeFormChange}
-                  margin="normal"
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Nom"
-                  name="lastName"
-                  value={employeeForm.lastName}
-                  onChange={handleEmployeeFormChange}
-                  margin="normal"
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Email"
-                  name="email"
-                  type="email"
-                  value={employeeForm.email}
-                  onChange={handleEmployeeFormChange}
-                  margin="normal"
-                  required
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <TextField
-                  fullWidth
-                  label="Téléphone"
-                  name="phone"
-                  value={employeeForm.phone}
-                  onChange={handleEmployeeFormChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth margin="normal" required>
-                  <InputLabel>Rôle</InputLabel>
-                  <Select
-                    name="role"
-                    value={employeeForm.role}
-                    onChange={handleEmployeeFormChange}
-                    label="Rôle"
-                  >
-                    {roles.map(role => (
-                      <MenuItem key={role.id} value={role.id}>
-                        {role.name}
-                      </MenuItem>
-                    ))}
-                  </Select>
-                </FormControl>
-              </Grid>
-              <Grid item xs={12} sm={6}>
-                <FormControl fullWidth margin="normal">
-                  <FormControlLabel
-                    control={
-                      <Switch
-                        checked={employeeForm.status === 'active'}
-                        onChange={(e) => 
-                          setEmployeeForm(prev => ({
-                            ...prev,
-                            status: e.target.checked ? 'active' : 'inactive'
-                          }))
-                        }
-                        color="primary"
-                      />
-                    }
-                    label={employeeForm.status === 'active' ? 'Actif' : 'Inactif'}
-                  />
-                </FormControl>
-              </Grid>
-            </Grid>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseEmployeeDialog}>Annuler</Button>
-            <Button 
-              onClick={handleSaveEmployee} 
-              variant="contained" 
-              color="primary"
-            >
-              {employeeDialog.mode === 'create' ? 'Créer' : 'Enregistrer'}
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Schedule Dialog */}
-        <Dialog
-          open={scheduleDialog.open}
-          onClose={handleCloseScheduleDialog}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>
-            Horaires de {scheduleDialog.employee?.firstName} {scheduleDialog.employee?.lastName}
-          </DialogTitle>
-          <DialogContent dividers>
-            <Box sx={{ mt: 2 }}>
-              {DAYS.map(day => (
-                <Box key={day.id} sx={{ mb: 3 }}>
-                  <Typography variant="subtitle1" gutterBottom>
-                    {day.name}
-                  </Typography>
-                  <Grid container spacing={2} alignItems="center">
-                    <Grid item xs={4}>
-                      <FormControlLabel
-                        control={
-                          <Switch
-                            checked={scheduleForm[day.id]?.active || false}
-                            onChange={(e) => 
-                              handleScheduleChange(day.id, 'active', e.target.checked)
-                            }
-                            color="primary"
-                          />
-                        }
-                        label={scheduleForm[day.id]?.active ? 'Actif' : 'Inactif'}
-                      />
-                    </Grid>
-                    {scheduleForm[day.id]?.active && (
-                      <>
-                        <Grid item xs={4}>
-                          <TimePicker
-                            label="Heure de début"
-                            value={scheduleForm[day.id]?.start}
-                            onChange={(newValue) => 
-                              handleScheduleChange(day.id, 'start', newValue)
-                            }
-                            renderInput={(params) => <TextField {...params} fullWidth />}
-                          />
-                        </Grid>
-                        <Grid item xs={4}>
-                          <TimePicker
-                            label="Heure de fin"
-                            value={scheduleForm[day.id]?.end}
-                            onChange={(newValue) => 
-                              handleScheduleChange(day.id, 'end', newValue)
-                            }
-                            renderInput={(params) => <TextField {...params} fullWidth />}
-                          />
-                        </Grid>
-                      </>
-                    )}
-                  </Grid>
-                </Box>
-              ))}
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseScheduleDialog}>Annuler</Button>
-            <Button 
-              onClick={handleSaveSchedule} 
-              variant="contained" 
-              color="primary"
-            >
-              Enregistrer
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Role Dialog */}
-        <Dialog
-          open={roleDialog.open}
-          onClose={handleCloseRoleDialog}
-          maxWidth="sm"
-          fullWidth
-        >
-          <DialogTitle>
-            {roleDialog.role ? `Modifier le rôle ${roleDialog.role.name}` : 'Créer un nouveau rôle'}
-          </DialogTitle>
-          <DialogContent dividers>
-            <Box sx={{ mt: 2 }}>
+      {/* Dialog pour employé */}
+      <Dialog 
+        open={employeeDialog.open} 
+        onClose={handleCloseEmployeeDialog} 
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>
+          {employeeDialog.mode === 'create' ? 'Nouvel employé' : 'Modifier l\'employé'}
+        </DialogTitle>
+        <DialogContent dividers>
+          <Grid container spacing={3} sx={{ mt: 1 }}>
+            <Grid item xs={12} sm={6}>
               <TextField
                 fullWidth
-                label="Nom du rôle"
-                name="name"
-                value={roleForm.name}
-                onChange={handleRoleFormChange}
-                margin="normal"
+                label="Prénom"
+                name="firstName"
+                value={employeeForm.firstName}
+                onChange={handleEmployeeFormChange}
                 required
-                disabled={roleDialog.role && Object.keys(SYSTEM_ROLES).includes(roleDialog.role.id)}
+                error={!employeeForm.firstName?.trim()}
+                helperText={!employeeForm.firstName?.trim() ? 'Le prénom est obligatoire' : ''}
               />
-              
-              <Typography variant="subtitle1" sx={{ mt: 3, mb: 2 }}>
-                Permissions
-              </Typography>
-              
-              <Grid container spacing={2}>
-                {PERMISSIONS.map(permission => (
-                  <Grid item xs={12} sm={6} key={permission.id}>
-                    <FormControlLabel
-                      control={
-                        <Switch
-                          checked={roleForm.permissions.includes(permission.id)}
-                          onChange={() => handlePermissionToggle(permission.id)}
-                          color="primary"
-                          disabled={roleDialog.role && Object.keys(SYSTEM_ROLES).includes(roleDialog.role.id)}
-                        />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Nom"
+                name="lastName"
+                value={employeeForm.lastName}
+                onChange={handleEmployeeFormChange}
+                required
+                error={!employeeForm.lastName?.trim()}
+                helperText={!employeeForm.lastName?.trim() ? 'Le nom est obligatoire' : ''}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Email"
+                name="email"
+                type="email"
+                value={employeeForm.email}
+                onChange={handleEmployeeFormChange}
+                required
+                error={!employeeForm.email?.trim()}
+                helperText={!employeeForm.email?.trim() ? 'L\'email est obligatoire' : ''}
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <TextField
+                fullWidth
+                label="Téléphone"
+                name="phone"
+                value={employeeForm.phone}
+                onChange={handleEmployeeFormChange}
+                placeholder="Ex: +224 123 456 789"
+              />
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth required error={!employeeForm.role}>
+                <InputLabel>Rôle</InputLabel>
+                <Select
+                  name="role"
+                  value={employeeForm.role}
+                  onChange={handleEmployeeFormChange}
+                  label="Rôle"
+                >
+                  {ROLES.map(role => (
+                    <MenuItem key={role.id} value={role.id}>
+                      {role.name}
+                    </MenuItem>
+                  ))}
+                </Select>
+                {!employeeForm.role && (
+                  <Typography variant="caption" color="error" sx={{ ml: 2, mt: 0.5 }}>
+                    Le rôle est obligatoire
+                  </Typography>
+                )}
+              </FormControl>
+            </Grid>
+            <Grid item xs={12} sm={6}>
+              <FormControl fullWidth>
+                <Box sx={{ display: 'flex', alignItems: 'center', mt: 2 }}>
+                  <Typography component="span" sx={{ mr: 2 }}>
+                    Statut:
+                  </Typography>
+                  <Stack direction="row" spacing={1} alignItems="center">
+                    <Typography variant="body2">Inactif</Typography>
+                    <Switch
+                      checked={employeeForm.status === 'active'}
+                      onChange={(e) => 
+                        setEmployeeForm(prev => ({
+                          ...prev,
+                          status: e.target.checked ? 'active' : 'inactive'
+                        }))
                       }
-                      label={permission.name}
+                      color="primary"
                     />
-                  </Grid>
-                ))}
-              </Grid>
-            </Box>
-          </DialogContent>
-          <DialogActions>
-            <Button onClick={handleCloseRoleDialog}>Annuler</Button>
-            <Button 
-              onClick={handleSaveRole} 
-              variant="contained" 
-              color="primary"
-              disabled={!roleForm.name || (roleDialog.role && Object.keys(SYSTEM_ROLES).includes(roleDialog.role.id))}
-            >
-              Enregistrer
-            </Button>
-          </DialogActions>
-        </Dialog>
-
-        {/* Snackbar for notifications */}
-        <Snackbar
-          open={snackbar.open}
-          autoHideDuration={6000}
-          onClose={handleCloseSnackbar}
-          anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-        >
-          <Alert
-            onClose={handleCloseSnackbar}
-            severity={snackbar.severity}
-            sx={{ width: '100%' }}
+                    <Typography variant="body2">Actif</Typography>
+                  </Stack>
+                </Box>
+              </FormControl>
+            </Grid>
+          </Grid>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseEmployeeDialog}>
+            Annuler
+          </Button>
+          <Button 
+            onClick={handleSaveEmployee} 
+            variant="contained" 
+            color="primary"
+            disabled={!employeeForm.firstName?.trim() || !employeeForm.lastName?.trim() || !employeeForm.email?.trim() || !employeeForm.role}
           >
-            {snackbar.message}
-          </Alert>
-        </Snackbar>
-      </Box>
-    </LocalizationProvider>
+            {employeeDialog.mode === 'create' ? 'Créer' : 'Enregistrer'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Snackbar pour les notifications */}
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={6000}
+        onClose={handleCloseSnackbar}
+        anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
+      >
+        <Alert
+          onClose={handleCloseSnackbar}
+          severity={snackbar.severity}
+          sx={{ width: '100%' }}
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </Box>
   );
 };
 

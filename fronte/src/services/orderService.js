@@ -1,35 +1,61 @@
 import axios from 'axios';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
+const BASE_URL = `${API_BASE_URL}/api/orders`;
+
+const axiosInstance = axios.create({
+  baseURL: BASE_URL,
+  headers: {
+    'Content-Type': 'application/json',
+  },
+});
+
+axiosInstance.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token');
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+  return config;
+});
 
 export const orderService = {
-  // Créer une nouvelle commande
   createOrder: async (orderData) => {
-    const response = await axios.post(`${API_BASE_URL}/orders`, orderData);
-    return response.data;
+    try {
+      const response = await axiosInstance.post('/', orderData);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la création de la commande:', error);
+      throw error;
+    }
   },
 
-  // Récupérer toutes les commandes (pour l'admin)
-  getAllOrders: async () => {
-    const response = await axios.get(`${API_BASE_URL}/orders`);
-    return response.data;
+  getOrders: async () => {
+    try {
+      const response = await axiosInstance.get('/');
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des commandes:', error);
+      throw error;
+    }
   },
 
-  // Récupérer les commandes d'un client spécifique
-  getCustomerOrders: async (customerId) => {
-    const response = await axios.get(`${API_BASE_URL}/orders/customer/${customerId}`);
-    return response.data;
+  getOrderById: async (id) => {
+    try {
+      const response = await axiosInstance.get(`/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de la commande ${id}:`, error);
+      throw error;
+    }
   },
 
-  // Mettre à jour le statut d'une commande
-  updateOrderStatus: async (orderId, status) => {
-    const response = await axios.patch(`${API_BASE_URL}/orders/${orderId}/status`, { status });
-    return response.data;
+  updateOrderStatus: async (id, status) => {
+    try {
+      const response = await axiosInstance.patch(`/${id}/status`, { status });
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du statut de la commande ${id}:`, error);
+      throw error;
+    }
   },
-
-  // Annuler une commande
-  cancelOrder: async (orderId) => {
-    const response = await axios.delete(`${API_BASE_URL}/orders/${orderId}`);
-    return response.data;
-  }
-}; 
+};

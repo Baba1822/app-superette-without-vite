@@ -130,7 +130,7 @@ const Dashboard = () => {
     const defaultStats = {
         statCards: [
             { title: 'Total Ventes', value: 0, trend: '+0%', icon: <TrendingUpIcon /> },
-            { title: 'Chiffre d\'affaires', value: '0 €', trend: '+0%', icon: <MoneyIcon /> },
+            { title: 'Chiffre d\'affaires', value: '0 Gnf', trend: '+0%', icon: <MoneyIcon /> },
             { title: 'Total Clients', value: 0, trend: '+0%', icon: <GroupIcon /> },
             { title: 'Total Produits', value: 0, trend: '+0%', icon: <ProductIcon /> }
         ]

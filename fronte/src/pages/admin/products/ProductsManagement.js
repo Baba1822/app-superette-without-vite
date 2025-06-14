@@ -50,85 +50,11 @@ import {
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
-import axios from 'axios';
-import frLocale from 'date-fns/locale/fr';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'react-toastify';
 import { productService } from '../../../services/productService';
+import frLocale from 'date-fns/locale/fr';
 
-// Types (JavaScript)
-const Product = {
-  id: 0,
-  nom: '',
-  categorie_id: 0,
-  categorie: null,
-  prix: 0,
-  stock: 0,
-  stock_min: 0,
-  description: '',
-  saison: false,
-  date_debut_saison: null,
-  date_fin_saison: null,
-  promotion: false,
-  type_promotion: 'percentage',
-  valeur_promotion: 0,
-  date_debut_promo: null,
-  date_fin_promo: null,
-  date_peremption: null,
-  image: null
-};
-
-const ProductForm = {
-  ...Product,
-  date_debut_saison: '',
-  date_fin_saison: '',
-  date_debut_promo: '',
-  date_fin_promo: '',
-  date_peremption: ''
-};
-
-const ProductsResponse = {
-  data: [],
-  total: 0,
-  page: 0,
-  pageSize: 0
-};
-
-const MutationResponse = {
-  success: false,
-  message: '',
-  data: null
-};
-
-const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-
-const handleError = (error) => {
-  console.error('Erreur:', error);
-  toast.error(error.response?.data?.message || 'Une erreur est survenue');
-  return Promise.reject(error);
-};
-
-const fetchWithAuth = async (url, options = {}) => {
-  try {
-    const token = localStorage.getItem('token');
-    const headers = options.headers || {};
-    if (token) {
-      headers.Authorization = `Bearer ${token}`;
-    }
-    const response = await axios({
-      ...options,
-      url: `${API_BASE_URL}${url}`,
-      headers
-    });
-    return response.data;
-  } catch (error) {
-    return handleError(error);
-  }
-};
-
-const ITEMS_PER_PAGE = 10;
-
-// Catégories typiques pour une supérette en Guinée (Conakry)
 const CATEGORIES = [
   { id: 1, nom: 'Boissons' },
   { id: 2, nom: 'Produits Laitiers' },
@@ -154,8 +80,6 @@ const CATEGORIES = [
 
 const ProductsManagement = () => {
   const queryClient = useQueryClient();
-
-  // State
   const [filters, setFilters] = useState({
     seasonalOnly: false,
     promotionsOnly: false,
@@ -166,10 +90,6 @@ const ProductsManagement = () => {
     open: false,
     item: null,
   });
-
-  const [loading, setLoading] = useState(false);
-  const [apiError, setApiError] = useState(null);
-  const [formError, setFormError] = useState(null);
 
   const initialFormState = {
     nom: '',
@@ -193,11 +113,10 @@ const ProductsManagement = () => {
   const [form, setForm] = useState(initialFormState);
   const [errors, setErrors] = useState({});
   const [page, setPage] = useState(0);
-  const [rowsPerPage, setRowsPerPage] = useState(ITEMS_PER_PAGE);
+  const [rowsPerPage, setRowsPerPage] = useState(10);
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
 
-  // Load initial data
   const { data: products = [], isLoading, error: queryError } = useQuery({
     queryKey: ['products'],
     queryFn: productService.getAllProducts
@@ -210,17 +129,21 @@ const ProductsManagement = () => {
       handleCloseDialog();
       toast.success('Produit ajouté avec succès');
     },
-    onError: handleError
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Erreur lors de la création du produit');
+    }
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data) => productService.updateProduct(data),
+    mutationFn: ({ id, ...productData }) => productService.updateProduct(id, productData),
     onSuccess: () => {
       queryClient.invalidateQueries(['products']);
       handleCloseDialog();
       toast.success('Produit mis à jour avec succès');
     },
-    onError: handleError
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Erreur lors de la mise à jour du produit');
+    }
   });
 
   const deleteMutation = useMutation({
@@ -229,13 +152,14 @@ const ProductsManagement = () => {
       queryClient.invalidateQueries(['products']);
       toast.success('Produit supprimé avec succès');
     },
-    onError: handleError
+    onError: (error) => {
+      toast.error(error.response?.data?.message || 'Erreur lors de la suppression du produit');
+    }
   });
 
-  // Handlers
   const handleFilterChange = (name, value) => {
     setFilters(prev => ({ ...prev, [name]: value }));
-    setPage(0); // Reset to first page when filters change
+    setPage(0);
   };
 
   const handleOpenDialog = (item = null) => {
@@ -385,15 +309,9 @@ const ProductsManagement = () => {
     if (!Array.isArray(products)) return [];
     
     return products.filter(product => {
-      // Filtre par saison
       if (filters.seasonalOnly && !product.saison) return false;
-      
-      // Filtre par promotion
       if (filters.promotionsOnly && !product.promotion) return false;
-      
-      // Filtre par catégorie
       if (filters.categoryFilter && product.categorie_id !== parseInt(filters.categoryFilter)) return false;
-      
       return true;
     });
   };
@@ -615,7 +533,6 @@ const ProductsManagement = () => {
           </Paper>
         </Grid>
 
-        {/* Dialog pour ajouter/modifier un produit */}
         <LocalizationProvider dateAdapter={AdapterDateFns} adapterLocale={frLocale}>
           <Dialog
             open={dialog.open}
@@ -835,7 +752,7 @@ const ProductsManagement = () => {
                           InputProps={{
                             startAdornment: (
                               <InputAdornment position="start">
-                                {form.type_promotion === 'percentage' ? '%' : '€'}
+                                {form.type_promotion === 'percentage' ? '%' : 'GNF'}
                               </InputAdornment>
                             ),
                           }}

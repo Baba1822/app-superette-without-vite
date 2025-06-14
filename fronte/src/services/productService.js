@@ -1,9 +1,11 @@
 import axios from 'axios';
+import { EventEmitter } from 'events';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const BASE_URL = `${API_BASE_URL}/api/products`;
 
-// Configuration d'Axios pour inclure le token JWT
+const eventEmitter = new EventEmitter();
+
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
   headers: {
@@ -11,7 +13,6 @@ const axiosInstance = axios.create({
   },
 });
 
-// Intercepteur pour ajouter le token aux requêtes
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
@@ -20,8 +21,18 @@ axiosInstance.interceptors.request.use((config) => {
   return config;
 });
 
+// Fonction pour émettre les événements
+const emitProductEvent = (action, product) => {
+  eventEmitter.emit('product-update', { action, product });
+};
+
 export const productService = {
-  // Récupérer tous les produits
+  // Écouter les changements de produits
+  subscribeToProducts: (callback) => {
+    eventEmitter.on('product-update', callback);
+    return () => eventEmitter.off('product-update', callback);
+  },
+
   getAllProducts: async () => {
     try {
       const response = await axiosInstance.get('/');
@@ -32,7 +43,6 @@ export const productService = {
     }
   },
 
-  // Récupérer un produit par ID
   getProductById: async (id) => {
     try {
       const response = await axiosInstance.get(`/${id}`);
@@ -43,10 +53,8 @@ export const productService = {
     }
   },
 
-  // Créer un nouveau produit
   createProduct: async (productData) => {
     try {
-      // Convertir les dates en format ISO
       const formattedData = {
         ...productData,
         date_debut_saison: productData.date_debut_saison?.toISOString(),
@@ -57,6 +65,7 @@ export const productService = {
       };
 
       const response = await axiosInstance.post('/', formattedData);
+      emitProductEvent('created', response.data);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la création du produit:', error);
@@ -64,10 +73,8 @@ export const productService = {
     }
   },
 
-  // Mettre à jour un produit
   updateProduct: async (id, productData) => {
     try {
-      // Convertir les dates en format ISO
       const formattedData = {
         ...productData,
         date_debut_saison: productData.date_debut_saison?.toISOString(),
@@ -78,6 +85,7 @@ export const productService = {
       };
 
       const response = await axiosInstance.put(`/${id}`, formattedData);
+      emitProductEvent('updated', response.data);
       return response.data;
     } catch (error) {
       console.error(`Erreur lors de la mise à jour du produit ${id}:`, error);
@@ -85,10 +93,10 @@ export const productService = {
     }
   },
 
-  // Supprimer un produit
   deleteProduct: async (id) => {
     try {
       const response = await axiosInstance.delete(`/${id}`);
+      emitProductEvent('deleted', { id });
       return response.data;
     } catch (error) {
       console.error(`Erreur lors de la suppression du produit ${id}:`, error);
@@ -96,7 +104,6 @@ export const productService = {
     }
   },
 
-  // Uploader une image
   uploadImage: async (id, file) => {
     try {
       const formData = new FormData();
@@ -111,6 +118,7 @@ export const productService = {
           },
         }
       );
+      emitProductEvent('updated', response.data);
       return response.data;
     } catch (error) {
       console.error(`Erreur lors de l'upload de l'image pour le produit ${id}:`, error);
@@ -118,7 +126,17 @@ export const productService = {
     }
   },
 
-  // Récupérer les produits en promotion
+  updateStock: async (id, quantityChange) => {
+    try {
+      const response = await axiosInstance.patch(`/${id}/stock`, { quantityChange });
+      emitProductEvent('updated', response.data);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du stock pour le produit ${id}:`, error);
+      throw error;
+    }
+  },
+
   getPromotionalProducts: async () => {
     try {
       const response = await axiosInstance.get('/promotions');
@@ -129,7 +147,6 @@ export const productService = {
     }
   },
 
-  // Récupérer les produits saisonniers
   getSeasonalProducts: async () => {
     try {
       const response = await axiosInstance.get('/seasonal');
@@ -140,7 +157,6 @@ export const productService = {
     }
   },
 
-  // Récupérer les produits avec stock faible
   getLowStockProducts: async () => {
     try {
       const response = await axiosInstance.get('/low-stock');

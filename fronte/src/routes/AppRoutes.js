@@ -7,6 +7,7 @@ import CashierLayout from '../layouts/CashierLayout';
 import ManagerLayout from '../layouts/ManagerLayout';
 import StockistLayout from '../layouts/StockistLayout';
 import ProtectedRoute from '../components/ProtectedRoute';
+import { ProductProvider } from '../context/ProductContext';
 
 // Public pages
 import Home from '../pages/Home';

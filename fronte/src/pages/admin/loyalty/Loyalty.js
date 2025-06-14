@@ -1,19 +1,20 @@
-import React, { useState, useEffect } from 'react';
 import {
     Add as AddIcon,
+    Delete as DeleteIcon,
     Edit as EditIcon,
     CardGiftcard as GiftIcon,
     Loyalty as LoyaltyIcon,
     Person as PersonIcon,
-    QrCode as QrCodeIcon,
-    Delete as DeleteIcon
+    QrCode as QrCodeIcon
 } from '@mui/icons-material';
 import {
+    Alert,
     Box,
     Button,
     Card,
     CardContent,
     Chip,
+    CircularProgress,
     Dialog,
     DialogActions,
     DialogContent,
@@ -35,14 +36,12 @@ import {
     TableRow,
     Tabs,
     TextField,
-    Typography,
-    Alert,
-    CircularProgress
+    Typography
 } from '@mui/material';
-import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { format } from 'date-fns';
-import LoyaltyService from '../../../services/LoyaltyService';
-
+import { useEffect, useState } from 'react';
+import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
+import { loyaltyService } from '../../../services/loyaltyService';
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
 const Loyalty = () => {
@@ -80,7 +79,7 @@ const Loyalty = () => {
             try {
                 // Charger les cartes de fidélité
                 const clientId = 1; // À remplacer par l'ID réel du client ou une gestion d'authentification
-                const cardData = await LoyaltyService.getLoyaltyCard(clientId);
+                const cardData = await loyaltyService.getLoyaltyCard(clientId);
                 setCards([{
                     id: clientId,
                     customerId: clientId,
@@ -95,7 +94,7 @@ const Loyalty = () => {
                 setLoading(prev => ({ ...prev, cards: false }));
 
                 // Charger les niveaux de fidélité
-                const tierInfo = await LoyaltyService.checkLoyaltyTier(clientId);
+                const tierInfo = await loyaltyService.checkLoyaltyTier(clientId);
                 setLoyaltyTiers([
                     {
                         name: 'Bronze',
@@ -116,12 +115,12 @@ const Loyalty = () => {
                 setLoading(prev => ({ ...prev, tiers: false }));
 
                 // Charger les récompenses disponibles
-                const rewards = await LoyaltyService.getAvailableRewards(clientId);
+                const rewards = await loyaltyService.getAvailableRewards(clientId);
                 setAvailableRewards(rewards);
                 setLoading(prev => ({ ...prev, rewards: false }));
 
                 // Charger l'historique des points
-                const history = await LoyaltyService.getPointsHistory(clientId);
+                const history = await loyaltyService.getPointsHistory(clientId);
                 setPointHistory(history.map(item => ({
                     id: item.date,
                     cardId: clientId,
@@ -133,7 +132,7 @@ const Loyalty = () => {
                 setLoading(prev => ({ ...prev, history: false }));
 
                 // Charger les analyses
-                const stats = await LoyaltyService.getLoyaltyStats();
+                const stats = await loyaltyService.getLoyaltyStats();
                 setAnalytics({
                     trends: stats.trends,
                     rewardDistribution: stats.rewardDistribution,
@@ -171,7 +170,7 @@ const Loyalty = () => {
         try {
             if (selectedCard?.id) {
                 // Mise à jour d'une carte existante
-                const updatedCard = await LoyaltyService.updateLoyaltyCard(selectedCard.id, selectedCard);
+                const updatedCard = await loyaltyService.updateLoyaltyCard(selectedCard.id, selectedCard);
                 setCards(cards.map(c => c.id === selectedCard.id ? updatedCard : c));
                 setSnackbar({
                     open: true,
@@ -180,7 +179,7 @@ const Loyalty = () => {
                 });
             } else {
                 // Création d'une nouvelle carte
-                const newCard = await LoyaltyService.createLoyaltyCard({
+                const newCard = await loyaltyService.createLoyaltyCard({
                     ...selectedCard,
                     points: selectedCard.points || 0,
                     tier: calculateTier(selectedCard?.points || 0)
@@ -207,7 +206,7 @@ const Loyalty = () => {
     // Supprimer une carte
     const handleDeleteCard = async (cardId) => {
         try {
-            await LoyaltyService.deleteLoyaltyCard(cardId);
+            await loyaltyService.deleteLoyaltyCard(cardId);
             setCards(cards.filter(c => c.id !== cardId));
             setSnackbar({
                 open: true,
@@ -227,7 +226,7 @@ const Loyalty = () => {
     // Échanger une récompense
     const redeemReward = async (card, reward) => {
         try {
-            const result = await LoyaltyService.redeemPoints(card.customerId, reward.id, reward.pointsCost);
+            const result = await loyaltyService.redeemPoints(card.customerId, reward.id, reward.pointsCost);
             
             // Mettre à jour les points localement
             setCards(cards.map(c => 
@@ -259,7 +258,7 @@ const Loyalty = () => {
             const card = cards.find(c => c.id === cardId);
             if (!card) return;
             
-            const result = await LoyaltyService.addPoints(card.customerId, amount, `purchase-${Date.now()}`);
+            const result = await loyaltyService.addPoints(card.customerId, amount, `purchase-${Date.now()}`);
             
             // Mettre à jour les points localement
             setCards(cards.map(c => 
