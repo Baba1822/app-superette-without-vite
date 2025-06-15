@@ -53,13 +53,40 @@ class Product {
     }
 
     static async getById(id) {
-        const [products] = await pool.query(
-            'SELECT p.*, c.nom as categorie_nom, c.description as categorie_description, c.image as categorie_image ' +
-            'FROM produits p LEFT JOIN categories_produits c ON p.categorie_id = c.id ' +
-            'WHERE p.id = ?',
-            [id]
-        );
-        return products[0];
+        try {
+            // D'abord récupérer le produit
+            const [products] = await pool.query(
+                'SELECT * FROM produits WHERE id = ?',
+                [id]
+            );
+            const product = products[0];
+            
+            if (!product) {
+                return null;
+            }
+
+            // Ensuite récupérer la catégorie
+            const [categories] = await pool.query(
+                'SELECT nom, description FROM categories_produits WHERE id = ?',
+                [product.categorie_id]
+            );
+            const category = categories[0];
+
+            // Combiner les résultats
+            const result = {
+                ...product,
+                categorie_nom: category?.nom,
+                categorie_description: category?.description
+            };
+
+            // Ajouter une image par défaut
+            result.categorie_image = 'default-category.jpg';
+
+            return result;
+        } catch (error) {
+            console.error('Erreur dans getById:', error);
+            throw error;
+        }
     }
 
     static async create(productData) {

@@ -30,7 +30,10 @@ const AdminNavigation = () => {
   // Récupération du nombre de commandes en attente - SYNTAXE CORRIGÉE POUR v5
   const { data: commandes = [] } = useQuery({
     queryKey: ['commandes'],
-    queryFn: orderService.getAllOrders,
+    queryFn: async () => {
+      const response = await orderService.getAllOrders();
+      return response.data;
+    },
     retry: false,
     onError: (error) => {
       console.warn('Erreur lors de la récupération des commandes:', error);

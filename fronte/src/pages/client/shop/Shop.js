@@ -29,7 +29,13 @@ import {
   DialogContent,
   DialogActions,
   Alert,
-  Snackbar
+  Snackbar,
+  Select,
+  MenuItem,
+  RadioGroup,
+  FormControlLabel,
+  Radio,
+  InputAdornment
 } from '@mui/material';
 import {
   Search as SearchIcon,
@@ -40,7 +46,9 @@ import {
   QrCode as QrIcon,
   PhoneAndroid as MobilePaymentIcon,
   AttachMoney as SplitPaymentIcon,
-  Close as CloseIcon
+  Close as CloseIcon,
+  FilterList as FilterListIcon,
+  FavoriteBorder as FavoriteBorderIcon
 } from '@mui/icons-material';
 import { useNavigate } from 'react-router-dom';
 import { useCart } from '../../../context/CartContext';
@@ -62,6 +70,35 @@ const scanLoyaltyCard = async () => {
 };
 
 const HomePage = () => {
+  const [filters, setFilters] = useState({
+    category: 'all',
+    priceRange: 'all',
+    sort: 'default'
+  });
+  const [showFilters, setShowFilters] = useState(false);
+  const [wishlist, setWishlist] = useState([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState(null);
+
+
+  const handleAddToWishlist = (product) => {
+    setWishlist(prev => [...prev, product]);
+    showNotification('Produit ajouté à la liste de souhaits', 'success');
+  };
+
+  const handleRemoveFromWishlist = (productId) => {
+    setWishlist(prev => prev.filter(item => item.id !== productId));
+    showNotification('Produit retiré de la liste de souhaits', 'info');
+  };
+
+  const handleFilterChange = (field, value) => {
+    setFilters(prev => ({
+      ...prev,
+      [field]: value
+    }));
+  };
+
+
   const navigate = useNavigate();
   const { cartItems = [], addToCart, clearCart } = useCart();
   const queryClient = useQueryClient();
@@ -191,12 +228,73 @@ const HomePage = () => {
     setCartOpen(!cartOpen);
   };
 
-  const handleOrangeMoneyPayment = () => {
-    window.location.href = '/api/payment/orange-money';
+  const handleOrangeMoneyPayment = async () => {
+    try {
+      // Simulation de la vérification du numéro Orange Money
+      const phoneNumber = prompt('Entrez votre numéro Orange Money:');
+      if (!phoneNumber) {
+        showNotification('Veuillez entrer un numéro de téléphone valide', 'error');
+        return;
+      }
+
+      // Simulation de la vérification du solde
+      const simulatedBalance = Math.floor(Math.random() * 1000000) + 100000; // Simule un solde entre 100 000 et 1 000 000 GNF
+      if (simulatedBalance < totalCartAmount) {
+        showNotification(`Solde insuffisant. Votre solde est de ${formatPrice(simulatedBalance)} GNF`, 'error');
+        return;
+      }
+
+      // Simulation du paiement
+      showNotification('Paiement en cours...', 'info');
+      await new Promise(resolve => setTimeout(resolve, 2000)); // Simule un délai de traitement
+
+      // Création de la commande
+      const orderData = {
+        items: cartItems,
+        total: totalCartAmount,
+        paymentMethod: 'orange_money',
+        deliveryAddress,
+        deliveryFee,
+        customer: {
+          phoneNumber
+        }
+      };
+
+      await createOrderMutation.mutateAsync(orderData);
+    } catch (error) {
+      console.error('Erreur lors du paiement:', error);
+      showNotification('Erreur lors du paiement', 'error');
+    }
   };
 
   const handleSplitPayment = () => {
-    navigate('/payment/split');
+    // Simulation du paiement fractionné
+    const installments = Math.floor((totalCartAmount / 400000) + 1); // Calcule le nombre de mensualités (environ 400 000 GNF par mensualité)
+    const monthlyAmount = Math.ceil(totalCartAmount / installments);
+
+    // Affiche les détails du paiement fractionné
+    const confirmation = window.confirm(`Votre commande sera payée en ${installments} mensualités de ${formatPrice(monthlyAmount)} GNF.
+    Total: ${formatPrice(totalCartAmount)} GNF
+    Voulez-vous continuer avec le paiement fractionné ?`);
+
+    if (confirmation) {
+      // Simulation du traitement du paiement fractionné
+      showNotification('Paiement fractionné en cours...', 'info');
+      setTimeout(() => {
+        // Création de la commande avec le mode de paiement fractionné
+        const orderData = {
+          items: cartItems,
+          total: totalCartAmount,
+          paymentMethod: 'split_payment',
+          deliveryAddress,
+          deliveryFee,
+          installments: installments,
+          monthlyAmount: monthlyAmount
+        };
+
+        createOrderMutation.mutate(orderData);
+      }, 2000); // Simule un délai de traitement
+    }
   };
 
   const handleLoyaltyCardScan = async () => {
@@ -335,222 +433,171 @@ const HomePage = () => {
   }
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
+    <Box sx={{ flexGrow: 1 }}>
       <AppBar position="static" color="primary">
         <Toolbar>
           <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            App Superette
+            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+              <LoyaltyIcon sx={{ color: 'white' }} />
+              Boutique
+            </Box>
           </Typography>
-          
-          <IconButton color="inherit" onClick={() => navigate('/profile')}>
-            <ProfileIcon />
-          </IconButton>
-          
-          <IconButton color="inherit" onClick={handleCartToggle}>
-            <Badge badgeContent={cartItems?.length || 0} color="secondary">
-              <CartIcon />
-            </Badge>
-          </IconButton>
+          <Box sx={{ display: 'flex', gap: 2 }}>
+            <IconButton color="inherit" onClick={() => setShowFilters(!showFilters)}>
+              <FilterListIcon />
+            </IconButton>
+            <IconButton color="inherit" onClick={handleCartToggle}>
+              <Badge badgeContent={cartItems.length} color="secondary">
+                <CartIcon />
+              </Badge>
+            </IconButton>
+            <IconButton color="inherit" onClick={() => navigate('/wishlist')}>
+              <Badge badgeContent={wishlist.length} color="secondary">
+                <FavoriteBorderIcon />
+              </Badge>
+            </IconButton>
+          </Box>
         </Toolbar>
-        
-        <Box sx={{ p: 2 }}>
-          <TextField
-            fullWidth
-            variant="outlined"
-            placeholder="Rechercher des produits..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            InputProps={{
-              startAdornment: <SearchIcon sx={{ mr: 1 }} />
-            }}
-          />
-        </Box>
       </AppBar>
 
-      <Container maxWidth="lg" sx={{ py: 3, flex: 1 }}>
-        <Paper sx={{ p: 2, mb: 3 }} elevation={3}>
+      <Drawer anchor="right" open={showFilters} onClose={() => setShowFilters(false)}>
+        <Box sx={{ width: 300, p: 2 }}>
           <Typography variant="h6" gutterBottom>
-            Options de Paiement
+            Filtrer les produits
           </Typography>
+          <Divider sx={{ mb: 2 }} />
           
-          <Grid container spacing={2}>
-            <Grid item xs={12} sm={4}>
-              <Button
+          <Typography variant="subtitle1" gutterBottom>
+            Catégorie
+          </Typography>
+          <Select
+            fullWidth
+            value={filters.category}
+            onChange={(e) => handleFilterChange('category', e.target.value)}
+            sx={{ mb: 2 }}
+          >
+            <MenuItem value="all">Toutes les catégories</MenuItem>
+            <MenuItem value="fruits">Fruits</MenuItem>
+            <MenuItem value="legumes">Légumes</MenuItem>
+            <MenuItem value="boissons">Boissons</MenuItem>
+          </Select>
+
+          <Typography variant="subtitle1" gutterBottom>
+            Prix
+          </Typography>
+          <RadioGroup
+            value={filters.priceRange}
+            onChange={(e) => handleFilterChange('priceRange', e.target.value)}
+            sx={{ mb: 2 }}
+          >
+            <FormControlLabel value="all" control={<Radio />} label="Tous les prix" />
+            <FormControlLabel value="low" control={<Radio />} label="Moins de 50000 GNF" />
+            <FormControlLabel value="medium" control={<Radio />} label="50000-100000 GNF" />
+            <FormControlLabel value="high" control={<Radio />} label="Plus de 100000 GNF" />
+          </RadioGroup>
+
+          <Typography variant="subtitle1" gutterBottom>
+            Trier par
+          </Typography>
+          <Select
+            fullWidth
+            value={filters.sort}
+            onChange={(e) => handleFilterChange('sort', e.target.value)}
+          >
+            <MenuItem value="default">Par défaut</MenuItem>
+            <MenuItem value="price-asc">Prix croissant</MenuItem>
+            <MenuItem value="price-desc">Prix décroissant</MenuItem>
+            <MenuItem value="name-asc">Nom (A-Z)</MenuItem>
+          </Select>
+        </Box>
+      </Drawer>
+
+      <Container sx={{ mt: 4 }}>
+        <Grid container spacing={3}>
+          <Grid item xs={12}>
+            <Box sx={{ display: 'flex', gap: 2, mb: 2 }}>
+              <TextField
                 fullWidth
-                variant="contained"
-                startIcon={<QrIcon />}
-                onClick={() => navigate('/online-payment')}
-              >
-                Paiement en Ligne
-              </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
+                placeholder="Rechercher des produits..."
+                variant="outlined"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                InputProps={{
+                  startAdornment: (
+                    <InputAdornment position="start">
+                      <SearchIcon />
+                    </InputAdornment>
+                  )
+                }}
+              />
               <Button
-                fullWidth
                 variant="contained"
-                color="warning"
-                startIcon={<MobilePaymentIcon />}
-                onClick={handleOrangeMoneyPayment}
+                color="primary"
+                startIcon={<FilterListIcon />}
+                onClick={() => setShowFilters(true)}
               >
-                Orange Money
+                Filtrer
               </Button>
-            </Grid>
-            
-            <Grid item xs={12} sm={4}>
-              <Button
-                fullWidth
-                variant="contained"
-                color="secondary"
-                startIcon={<SplitPaymentIcon />}
-                onClick={handleSplitPayment}
-              >
-                Paiement Fractionné
-              </Button>
-            </Grid>
+            </Box>
           </Grid>
 
-          <Box sx={{ mt: 3, p: 2, bgcolor: 'background.paper', borderRadius: 1 }}>
-            <Typography variant="h6" gutterBottom>
-              Carte de Fidélité
-            </Typography>
-            
-            {loyaltyCard ? (
-              <Box>
-                <Grid container spacing={2}>
-                  <Grid item xs={12} md={6}>
+          <Grid item xs={12}>
+            <Paper sx={{ p: 2, mb: 2 }}>
+              <Typography variant="h5" gutterBottom>
+                Produits populaires
+              </Typography>
+              <Slider
+                dots={true}
+                infinite={true}
+                speed={500}
+                slidesToShow={4}
+                slidesToScroll={1}
+                autoplay={true}
+                autoplaySpeed={3000}
+              >
+                {promotions.map((product) => (
+                  <Box key={product.id} sx={{ p: 1 }}>
                     <Card>
+                      <CardMedia
+                        component="img"
+                        height="200"
+                        image={product.image || '/default-product.jpg'}
+                        alt={product.nom}
+                      />
                       <CardContent>
-                        <Typography variant="h6" gutterBottom>
-                          {loyaltyCard.cardNumber}
+                        <Typography gutterBottom variant="h6" component="div">
+                          {product.nom}
                         </Typography>
-                        <Typography color="textSecondary">
-                          Niveau: {loyaltyCard.tier}
+                        <Typography variant="body2" color="text.secondary">
+                          {product.description}
                         </Typography>
-                        <Typography variant="h5" sx={{ mt: 1 }}>
-                          {loyaltyCard.points} points
-                        </Typography>
-                        <Button
-                          fullWidth
-                          variant="contained"
-                          startIcon={<QrIcon />}
-                          onClick={handleLoyaltyCardScan}
-                          sx={{ mt: 2 }}
-                        >
-                          Scanner la carte
-                        </Button>
+                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 1 }}>
+                          <Chip
+                            label={`${formatPrice(product.prix)}`}
+                            color="primary"
+                            variant="outlined"
+                          />
+                          <Chip
+                            label={`-${product.discount}%`}
+                            color="success"
+                            size="small"
+                          />
+                        </Box>
                       </CardContent>
                     </Card>
-                  </Grid>
-                  <Grid item xs={12} md={6}>
-                    <Typography variant="subtitle1" gutterBottom>
-                      Avantages:
-                    </Typography>
-                    <List>
-                      {loyaltyCard.tier === 'Bronze' && (
-                        <ListItem>
-                          <ListItemText>
-                            1 point pour chaque 100 GNF dépensés
-                          </ListItemText>
-                        </ListItem>
-                      )}
-                      {loyaltyCard.tier === 'Silver' && (
-                        <ListItem>
-                          <ListItemText>
-                            1.5 points pour chaque 100 GNF dépensés
-                          </ListItemText>
-                        </ListItem>
-                      )}
-                      {loyaltyCard.tier === 'Gold' && (
-                        <ListItem>
-                          <ListItemText>
-                            2 points pour chaque 100 GNF dépensés
-                          </ListItemText>
-                        </ListItem>
-                      )}
-                    </List>
-                    <Box sx={{ mt: 2 }}>
-                      <Button
-                        fullWidth
-                        variant="contained"
-                        color="primary"
-                        onClick={() => setShowRedeemDialog(true)}
-                      >
-                        Réduire des points
-                      </Button>
-                    </Box>
-                  </Grid>
-                </Grid>
-              </Box>
-            ) : (
-              <Box sx={{ textAlign: 'center', py: 3 }}>
-                <Typography variant="body1">
-                  Vous n'avez pas encore de carte de fidélité
-                </Typography>
-                <Button
-                  variant="contained"
-                  color="primary"
-                  onClick={() => navigate('/loyalty')}
-                  sx={{ mt: 2 }}
-                >
-                  Créer une carte
-                </Button>
-              </Box>
-            )}
-          </Box>
+                  </Box>
+                ))}
+              </Slider>
+            </Paper>
+          </Grid>
 
-          <Box sx={{ mt: 3 }}>
-            <Typography variant="h6" gutterBottom>
-              Total à payer: {formatPrice(totalCartAmount)} GNF
-            </Typography>
-            <Button
-              fullWidth
-              variant="contained"
-              color="primary"
-              onClick={handleCheckout}
-              sx={{ mt: 2 }}
-              disabled={cartItems.length === 0}
-            >
-              Passer à la caisse
-            </Button>
-          </Box>
-        </Paper>
-
-        {!promotionsLoading && promotions.length > 0 && (
-          <Box sx={{ mb: 3 }}>
-            <Slider {...{
-              dots: true,
-              infinite: true,
-              speed: 500,
-              slidesToShow: 1,
-              slidesToScroll: 1,
-              autoplay: true,
-              autoplaySpeed: 5000
-            }}>
-              {promotions.map(promo => (
-                <Box key={promo.id} sx={{ p: 1 }}>
-                  <Paper sx={{ p: 2, textAlign: 'center', height: 150, display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
-                    <Typography variant="h6">{promo.title}</Typography>
-                    <Typography variant="body1">{promo.description}</Typography>
-                  </Paper>
-                </Box>
-              ))}
-            </Slider>
-          </Box>
-        )}
-
-        <Box sx={{ mb: 2 }}>
-          <Typography variant="h5" gutterBottom>
-            Produits Disponibles
-          </Typography>
-          
           <Tabs value={activeTab} onChange={handleTabChange} aria-label="product categories">
             <Tab label="Tous" />
             <Tab label="Boissons" />
             <Tab label="Produits Laitiers" />
             <Tab label="Fruits et Légumes" />
           </Tabs>
-        </Box>
+        </Grid>
 
         {filteredProducts.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 4 }}>
@@ -609,11 +656,11 @@ const HomePage = () => {
                       <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                         {isPromo ? (
                           <>
-                            <Typography sx={{ textDecoration: 'line-through', color: 'text.disabled' }}>
-                              {formatPrice(product.prix)}
+                            <Typography variant="body2" color="text.secondary">
+                              Prix normal: {formatPrice(product.prix)}
                             </Typography>
-                            <Typography color="error" fontWeight="bold">
-                              {formatPrice(promoPrice)}
+                            <Typography variant="h6" color="primary">
+                              Prix promo: {formatPrice(promoPrice)}
                             </Typography>
                           </>
                         ) : (

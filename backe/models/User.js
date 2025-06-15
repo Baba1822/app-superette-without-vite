@@ -68,6 +68,21 @@ class User {
             [hashedPassword, id]
         );
     }
+
+    static async findByRefreshToken(refreshToken) {
+        const [users] = await pool.query(
+            'SELECT * FROM utilisateurs WHERE refresh_token = ?',
+            [refreshToken]
+        );
+        return users[0];
+    }
+
+    static async updateRefreshToken(userId, newRefreshToken) {
+        await pool.query(
+            'UPDATE utilisateurs SET refresh_token = ? WHERE id = ?',
+            [newRefreshToken, userId]
+        );
+    }
 }
 
 module.exports = User;

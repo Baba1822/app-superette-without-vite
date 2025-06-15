@@ -58,9 +58,25 @@ exports.updateProduct = async (req, res) => {
 
 exports.deleteProduct = async (req, res) => {
   try {
-    await Product.delete(req.params.id);
+    const productId = parseInt(req.params.id);
+    if (isNaN(productId)) {
+      return res.status(400).json({ error: 'ID invalide' });
+    }
+
+    // Vérifier si le produit existe
+    const product = await Product.getById(productId);
+    if (!product) {
+      return res.status(404).json({ error: 'Produit non trouvé' });
+    }
+
+    // Supprimer le produit
+    await Product.delete(productId);
     res.json({ message: 'Produit supprimé avec succès' });
   } catch (error) {
+    console.error('Erreur lors de la suppression du produit:', error);
+    if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+      return res.status(400).json({ error: 'Impossible de supprimer ce produit car il est utilisé dans d\'autres tables' });
+    }
     res.status(500).json({ error: 'Erreur lors de la suppression du produit' });
   }
 };
@@ -75,8 +91,17 @@ exports.uploadImage = async (req, res) => {
     const imagePath = `/uploads/${req.file.filename}`;
     await Product.update(req.params.id, { image: imagePath });
 
+    // Ajouter une vérification pour s'assurer que l'image est bien enregistrée
+    if (!req.file.destination || !req.file.filename) {
+      throw new Error('Erreur lors de l\'enregistrement de l\'image');
+    }
+
     res.json({ imageUrl: imagePath });
   } catch (error) {
+    // Ajouter une gestion d'erreur pour supprimer l'image en cas d'échec
+    if (req.file && req.file.filename) {
+      await Product.deleteImage(req.file.filename);
+    }
     res.status(500).json({ error: 'Erreur lors de l\'upload de l\'image' });
   }
 };

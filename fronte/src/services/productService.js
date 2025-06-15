@@ -2,22 +2,49 @@ import axios from 'axios';
 import { EventEmitter } from 'events';
 
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-const BASE_URL = `${API_BASE_URL}/api/products`;
+// Base URL sans le slash final pour éviter les doubles slashes
+const API_BASE_URL_NO_SLASH = API_BASE_URL.endsWith('/') ? API_BASE_URL.slice(0, -1) : API_BASE_URL;
+const BASE_URL = `${API_BASE_URL_NO_SLASH}/api/products`;
 
 const eventEmitter = new EventEmitter();
 
+// Création de l'instance axios avec une configuration personnalisée
 const axiosInstance = axios.create({
-  baseURL: BASE_URL,
+  baseURL: API_BASE_URL_NO_SLASH,
   headers: {
     'Content-Type': 'application/json',
   },
+  // Configuration pour éviter les doubles slashes
+  transformRequest: [(data) => {
+    // Supprimer les slashes doubles dans l'URL
+    if (data && typeof data === 'object') {
+      const url = data.url || '';
+      data.url = url.replace(/\/+/g, '/');
+    }
+    return data;
+  }],
+  // Configuration pour les requêtes
+  paramsSerializer: params => {
+    return new URLSearchParams(params).toString();
+  }
 });
 
+// Middleware pour gérer les URLs
 axiosInstance.interceptors.request.use((config) => {
   const token = localStorage.getItem('token');
   if (token) {
     config.headers.Authorization = `Bearer ${token}`;
   }
+  
+  // Utiliser l'URL complète pour éviter les problèmes de base URL
+  if (config.url?.startsWith('/')) {
+    config.url = `${BASE_URL}${config.url}`;
+  }
+  
+  // Logging pour débogage
+  console.log('Requête:', config.method.toUpperCase(), config.url);
+  console.log('Params:', config.params);
+  
   return config;
 });
 
@@ -95,12 +122,32 @@ export const productService = {
 
   deleteProduct: async (id) => {
     try {
-      const response = await axiosInstance.delete(`/${id}`);
+      // Vérifier que l'ID est un nombre
+      const productId = parseInt(id);
+      if (isNaN(productId)) {
+        throw new Error('ID invalide');
+      }
+
+      // Construire l'URL complète
+      const url = `${BASE_URL}${id}`;
+      console.log('URL de suppression:', url);
+
+      // Utiliser l'URL complète
+      const response = await axiosInstance.delete(url);
       emitProductEvent('deleted', { id });
       return response.data;
     } catch (error) {
       console.error(`Erreur lors de la suppression du produit ${id}:`, error);
-      throw error;
+      const errorMessage = error.response?.data?.error || 
+                         error.message || 
+                         'Erreur lors de la suppression du produit';
+      
+      throw {
+        message: errorMessage,
+        status: error.response?.status || 500,
+        data: error.response?.data,
+        url: `${BASE_URL}${id}`
+      };
     }
   },
 
@@ -110,7 +157,7 @@ export const productService = {
       formData.append('image', file);
 
       const response = await axiosInstance.post(
-        `/${id}/upload-image`,
+        `/upload-image/${id}`,
         formData,
         {
           headers: {

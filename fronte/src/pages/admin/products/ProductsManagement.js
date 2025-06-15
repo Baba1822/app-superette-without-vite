@@ -286,9 +286,17 @@ const ProductsManagement = () => {
     }
   };
 
-  const deleteProduct = (id) => {
+  const deleteProduct = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
-      deleteMutation.mutate(id);
+      try {
+        await deleteMutation.mutateAsync(id);
+        toast.success('Produit supprimé avec succès');
+        queryClient.invalidateQueries(['products']);
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        const errorMessage = error?.message || 'Erreur lors de la suppression du produit';
+        toast.error(errorMessage);
+      }
     }
   };
 

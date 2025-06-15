@@ -56,23 +56,70 @@ export const AuthProvider = ({ children }) => {
   // Vérification initiale du token
   useEffect(() => {
     const checkAuth = async () => {
-      const token = localStorage.getItem('token');
-      if (token && isTokenValid()) {
-        try {
-          const decoded = jwtDecode(token);
-          setUser({
-            id: decoded.id,
-            email: decoded.email,
-            prenom: decoded.prenom,
-            nom: decoded.nom,
-            type: decoded.type || decoded.role
-          });
-        } catch (error) {
-          console.error('Erreur de décodage du token:', error);
-          logout();
+      try {
+        const token = localStorage.getItem('token');
+        if (!token) {
+          setLoading(false);
+          return;
         }
+
+        // Vérifier si le token est valide
+        if (!isTokenValid()) {
+          console.log('Token expiré, tentative de rafraîchissement...');
+          try {
+            // Ici, vous pouvez implémenter la logique de rafraîchissement du token
+            // Si vous avez une route de rafraîchissement sur votre backend
+            const refreshToken = localStorage.getItem('refreshToken');
+            if (refreshToken) {
+              const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+                method: 'POST',
+                headers: {
+                  'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({ refreshToken })
+              });
+
+              if (response.ok) {
+                const data = await response.json();
+                localStorage.setItem('token', data.token);
+                const decoded = jwtDecode(data.token);
+                setUser({
+                  id: decoded.id,
+                  email: decoded.email,
+                  prenom: decoded.prenom,
+                  nom: decoded.nom,
+                  type: decoded.type || decoded.role
+                });
+              } else {
+                console.error('Échec du rafraîchissement du token');
+                logout();
+              }
+            } else {
+              console.log('Pas de refresh token, déconnexion...');
+              logout();
+            }
+          } catch (error) {
+            console.error('Erreur lors du rafraîchissement du token:', error);
+            logout();
+          }
+          return;
+        }
+
+        // Token valide, continuer
+        const decoded = jwtDecode(token);
+        setUser({
+          id: decoded.id,
+          email: decoded.email,
+          prenom: decoded.prenom,
+          nom: decoded.nom,
+          type: decoded.type || decoded.role
+        });
+      } catch (error) {
+        console.error('Erreur de décodage du token:', error);
+        logout();
+      } finally {
+        setLoading(false);
       }
-      setLoading(false);
     };
 
     checkAuth();
