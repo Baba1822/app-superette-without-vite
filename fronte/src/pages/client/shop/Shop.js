@@ -641,6 +641,7 @@ const HomePage = () => {
                       alt={product.nom || 'Produit'}
                       onError={(e) => {
                         e.target.src = '/placeholder-product.png';
+                        e.target.onerror = null; // Prevent infinite loop if placeholder is also missing
                       }}
                     />
                     

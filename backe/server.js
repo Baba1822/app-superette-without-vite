@@ -4,9 +4,14 @@ const cors = require('cors');
 const errorHandler = require('./utils/errorHandler');
 const { validate } = require('./utils/validators');
 const pool = require('./config/database');
+const path = require('path');
+
+// Configuration du port
+const PORT = process.env.PORT || 5000;
+console.log(`Configuration du serveur pour le port ${PORT}`);
 
 // Controllers
-const { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct, getProductsByCategory } = require('./controllers/productController');
+const { getAllProducts, getProductById, createProduct, updateProduct, deleteProduct, getProductsByCategory, upload, Product } = require('./controllers/productController');
 const { createOrder, getAllOrders, updateOrderStatus, getOrderDetails } = require('./controllers/orderController');
 const { register, login, getCurrentUser } = require('./controllers/authController');
 
@@ -15,7 +20,7 @@ const app = express();
 
 // Configuration CORS avec options détaillées
 app.use(cors({
-    origin: ['http://localhost:3000', 'http://localhost:3001'], // Ajustez selon vos besoins
+    origin: '*', // Pour le développement
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']
@@ -33,6 +38,45 @@ app.use(express.urlencoded({
     extended: true,
     parameterLimit: 50000
 }));
+
+// Middleware pour servir les fichiers statiques
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Routes pour les images
+app.post('/api/products/:id/image', upload.single('image'), async (req, res) => {
+  try {
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: 'Aucun fichier n\'a été téléchargé'
+      });
+    }
+
+    const productId = parseInt(req.params.id);
+    if (isNaN(productId)) {
+      return res.status(400).json({
+        success: false,
+        message: 'ID de produit invalide'
+      });
+    }
+
+    const imagePath = await Product.uploadImage(productId, req.file);
+    res.status(200).json({
+      success: true,
+      message: 'Image téléchargée avec succès',
+      imagePath: imagePath
+    });
+  } catch (error) {
+    console.error('Erreur lors du téléchargement de l\'image:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Erreur serveur lors du téléchargement de l\'image',
+      error: error.message
+    });
+  }
+});
+
+// Routes existantes...
 
 // Middleware pour les headers de sécurité
 app.use((req, res, next) => {
@@ -117,6 +161,8 @@ app.use('/api/invoices', require('./routes/invoices'));
 
 // Manager routes
 app.use('/api/manager', require('./routes/manager'));
+// Serve static files
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Route de test pour vérifier le serveur
 app.get('/api/health', (req, res) => {
@@ -141,8 +187,6 @@ app.use('*', (req, res) => {
 
 // Error handling middleware (doit être en dernier)
 app.use(errorHandler);
-
-const PORT = process.env.PORT || 5000;
 
 // Fonction pour vérifier si le port est disponible
 const isPortAvailable = (port) => new Promise((resolve, reject) => {

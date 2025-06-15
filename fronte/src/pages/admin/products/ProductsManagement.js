@@ -117,43 +117,91 @@ const ProductsManagement = () => {
   const [selectedProduct, setSelectedProduct] = useState(null);
   const [imageFile, setImageFile] = useState(null);
 
-  const { data: products = [], isLoading, error: queryError } = useQuery({
-    queryKey: ['products'],
-    queryFn: productService.getAllProducts
-  });
-
-  const createMutation = useMutation({
-    mutationFn: (productData) => productService.createProduct(productData),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['products']);
-      handleCloseDialog();
-      toast.success('Produit ajouté avec succès');
-    },
+  // Récupération des produits
+  const { 
+    data: products = [], 
+    isLoading, 
+    error: queryError 
+  } = useQuery({
+    queryKey: ['products', filters],
+    queryFn: () => productService.getAllProducts({
+      seasonalOnly: filters.seasonalOnly,
+      promotionsOnly: filters.promotionsOnly,
+      categoryId: filters.categoryFilter
+    }),
+    staleTime: 5 * 60 * 1000,
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Erreur lors de la création du produit');
+      toast.error(`Erreur de chargement: ${error.message}`);
     }
   });
 
+
+  // Mutation pour la création
+  const createMutation = useMutation({
+    mutationFn: productService.createProduct,
+    onSuccess: (data) => {
+      if (imageFile) {
+        productService.uploadImage(data.id, imageFile)
+          .then(() => {
+            queryClient.invalidateQueries(['products']);
+            toast.success('Produit créé avec image');
+          })
+          .catch(uploadError => {
+            console.error('Erreur upload:', uploadError);
+            toast.warning('Produit créé mais erreur lors de l\'upload de l\'image');
+          });
+      } else {
+        queryClient.invalidateQueries(['products']);
+      }
+      handleCloseDialog();
+      toast.success('Produit créé avec succès');
+    },
+    onError: (error) => {
+      toast.error(error.message || 'Erreur lors de la création');
+    }
+  });
+  // Mutation pour la mise à jour
   const updateMutation = useMutation({
-    mutationFn: ({ id, ...productData }) => productService.updateProduct(id, productData),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['products']);
+    mutationFn: ({ id, ...data }) => productService.updateProduct(id, data),
+    onSuccess: (data, variables) => {
+      if (imageFile) {
+        productService.uploadImage(variables.id, imageFile)
+          .then(() => {
+            queryClient.invalidateQueries(['products']);
+            toast.success('Produit et image mis à jour');
+          })
+          .catch(uploadError => {
+            console.error('Erreur upload:', uploadError);
+            toast.warning('Produit mis à jour mais erreur lors de l\'upload de l\'image');
+          });
+      } else {
+        queryClient.invalidateQueries(['products']);
+      }
       handleCloseDialog();
       toast.success('Produit mis à jour avec succès');
     },
     onError: (error) => {
-      toast.error(error.response?.data?.message || 'Erreur lors de la mise à jour du produit');
+      toast.error(error.message || 'Erreur lors de la mise à jour');
     }
   });
 
+  // Mutation pour la suppression
   const deleteMutation = useMutation({
-    mutationFn: (id) => productService.deleteProduct(id),
-    onSuccess: () => {
+    mutationFn: productService.deleteProduct,
+    onSuccess: (_, id) => {
       queryClient.invalidateQueries(['products']);
-      toast.success('Produit supprimé avec succès');
+      toast.success(`Produit #${id} supprimé`);
     },
-    onError: (error) => {
-      toast.error(error.response?.data?.message || 'Erreur lors de la suppression du produit');
+    onError: (error, id) => {
+      console.error('Delete error:', error);
+      const message = error.status === 404 
+        ? 'Produit déjà supprimé' 
+        : error.message || 'Erreur lors de la suppression';
+      toast.error(message);
+      
+      if (error.status === 404) {
+        queryClient.invalidateQueries(['products']);
+      }
     }
   });
 
@@ -161,6 +209,7 @@ const ProductsManagement = () => {
     setFilters(prev => ({ ...prev, [name]: value }));
     setPage(0);
   };
+
 
   const handleOpenDialog = (item = null) => {
     if (item) {
@@ -255,8 +304,8 @@ const ProductsManagement = () => {
   };
 
   const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validateForm()) return;
+  e.preventDefault();
+  if (!validateForm()) return;
 
     const productData = {
       ...form,
@@ -271,34 +320,66 @@ const ProductsManagement = () => {
       date_peremption: form.date_peremption,
     };
 
-    try {
-      if (!selectedProduct) {
-        await createMutation.mutateAsync(productData);
-      } else {
-        await updateMutation.mutateAsync({ id: selectedProduct.id, ...productData });
-      }
-
-      if (imageFile) {
-        await productService.uploadImage(selectedProduct ? selectedProduct.id : createMutation.data.id, imageFile);
-      }
-    } catch (error) {
-      console.error('Error submitting form:', error);
-    }
-  };
-
-  const deleteProduct = async (id) => {
-    if (window.confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) {
       try {
-        await deleteMutation.mutateAsync(id);
-        toast.success('Produit supprimé avec succès');
+    let productId;
+    
+    if (!selectedProduct) {
+      // Create new product
+      const createdProduct = await createMutation.mutateAsync(productData);
+      productId = createdProduct.id;
+    } else {
+      // Update existing product
+      await updateMutation.mutateAsync({ id: selectedProduct.id, ...productData });
+      productId = selectedProduct.id;
+    }
+
+    // Upload image if there is one
+    if (imageFile) {
+      try {
+        await productService.uploadImage(productId, imageFile);
         queryClient.invalidateQueries(['products']);
-      } catch (error) {
-        console.error('Erreur lors de la suppression:', error);
-        const errorMessage = error?.message || 'Erreur lors de la suppression du produit';
-        toast.error(errorMessage);
+        toast.success('Image téléchargée avec succès');
+      } catch (uploadError) {
+        console.error('Erreur upload:', uploadError);
+        toast.warning('Produit sauvegardé mais erreur lors de l\'upload de l\'image');
       }
     }
-  };
+
+    handleCloseDialog();
+    toast.success(`Produit ${selectedProduct ? 'mis à jour' : 'créé'} avec succès`);
+  } catch (error) {
+    console.error('Error submitting form:', error);
+    toast.error(error.message || 'Une erreur est survenue');
+  }
+};
+ const deleteProduct = async (id) => {
+  if (window.confirm(`Êtes-vous sûr de vouloir supprimer le produit #${id} ?`)) {
+    try {
+      await productService.deleteProduct(id);
+      toast.success(`Produit #${id} supprimé avec succès`);
+      queryClient.invalidateQueries(['products']);
+    } catch (error) {
+      console.error('Erreur lors de la suppression:', error);
+      
+      let errorMessage = error.message || 'Erreur lors de la suppression';
+      
+      if (error.status === 500) {
+        errorMessage = 'Erreur serveur - veuillez réessayer plus tard';
+      } else if (error.status === 404) {
+        errorMessage = 'Produit non trouvé';
+      } else if (error.message.includes('contrainte') || error.message.includes('référencé')) {
+        errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
+      }
+
+      toast.error(errorMessage);
+      
+      // Si le produit n'existe plus, on actualise la liste
+      if (error.status === 404) {
+        queryClient.invalidateQueries(['products']);
+      }
+    }
+  }
+};
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
