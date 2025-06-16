@@ -43,6 +43,10 @@ const OrdersManagement = () => {
   const [statusDialogOpen, setStatusDialogOpen] = useState(false);
   const [newStatus, setNewStatus] = useState('');
   const [statusNote, setStatusNote] = useState('');
+  const [deliveryDialogOpen, setDeliveryDialogOpen] = useState(false);
+  const [deliveryStatus, setDeliveryStatus] = useState('');
+  const [deliveryNote, setDeliveryNote] = useState('');
+  const [notification, setNotification] = useState(null);
 
   // Charger les commandes
   const { data: orders = [], isLoading } = useQuery({
@@ -50,16 +54,28 @@ const OrdersManagement = () => {
     queryFn: orderService.getAllOrders
   });
 
-  // Mutation pour mettre à jour le statut
-  const updateStatusMutation = useMutation({
+  // Mutations pour mettre à jour les statuts
+  const updateOrderStatusMutation = useMutation({
     mutationFn: ({ orderId, status }) => orderService.updateOrderStatus(orderId, status),
     onSuccess: () => {
       queryClient.invalidateQueries(['orders']);
       setStatusDialogOpen(false);
-      toast.success('Statut mis à jour avec succès');
+      toast.success('Statut de la commande mis à jour avec succès');
     },
     onError: () => {
-      toast.error('Erreur lors de la mise à jour du statut');
+      toast.error('Erreur lors de la mise à jour du statut de la commande');
+    }
+  });
+
+  const updateDeliveryStatusMutation = useMutation({
+    mutationFn: ({ orderId, status }) => orderService.updateDeliveryStatus(orderId, status),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['orders']);
+      setDeliveryDialogOpen(false);
+      toast.success('Statut de la livraison mis à jour avec succès');
+    },
+    onError: () => {
+      toast.error('Erreur lors de la mise à jour du statut de la livraison');
     }
   });
 
@@ -86,20 +102,91 @@ const OrdersManagement = () => {
     return colors[status] || 'default';
   };
 
-  // Gérer le changement de statut
-  const handleStatusChange = () => {
+  // Gérer le changement de statut de la commande
+  const handleOrderStatusChange = () => {
     if (!newStatus) {
       toast.error('Veuillez sélectionner un statut');
       return;
     }
 
-    updateStatusMutation.mutate({
+    updateOrderStatusMutation.mutate({
       orderId: selectedOrder.id,
       status: {
         status: newStatus,
         note: statusNote
       }
     });
+  };
+
+  // Gérer le statut de la livraison
+  const handleDeliveryStatusChange = () => {
+    if (!deliveryStatus) {
+      toast.error('Veuillez sélectionner un statut de livraison');
+      return;
+    }
+
+    updateDeliveryStatusMutation.mutate({
+      orderId: selectedOrder.id,
+      status: {
+        status: deliveryStatus,
+        note: deliveryNote
+      }
+    });
+  };
+
+  // Envoyer une notification à l'utilisateur
+  const sendNotification = async (orderId, message, type) => {
+    try {
+      await orderService.sendNotification(orderId, {
+        message,
+        type
+      });
+      toast.success('Notification envoyée avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de l\'envoi de la notification');
+    }
+  };
+
+  // Gérer le changement de statut
+  const handleStatusChange = (type) => {
+    if (type === 'order') {
+      if (!newStatus) {
+        toast.error('Veuillez sélectionner un statut');
+        return;
+      }
+
+      updateOrderStatusMutation.mutate({
+        orderId: selectedOrder.id,
+        status: {
+          status: newStatus,
+          note: statusNote
+        }
+      });
+    } else if (type === 'delivery') {
+      if (!deliveryStatus) {
+        toast.error('Veuillez sélectionner un statut de livraison');
+        return;
+      }
+
+      updateDeliveryStatusMutation.mutate({
+        orderId: selectedOrder.id,
+        status: {
+          status: deliveryStatus,
+          note: deliveryNote
+        }
+      });
+    }
+  };
+
+  // Mettre à jour le montant des ventes
+  const updateSalesAmount = async (orderId, amount) => {
+    try {
+      await orderService.updateSalesAmount(orderId, amount);
+      queryClient.invalidateQueries(['orders']);
+      toast.success('Montant des ventes mis à jour avec succès');
+    } catch (error) {
+      toast.error('Erreur lors de la mise à jour du montant des ventes');
+    }
   };
 
   // Voir les détails d'une commande
@@ -294,9 +381,9 @@ const OrdersManagement = () => {
           <Button
             variant="contained"
             onClick={handleStatusChange}
-            disabled={updateStatusMutation.isLoading}
+            disabled={updateOrderStatusMutation.isLoading}
           >
-            {updateStatusMutation.isLoading ? 'En cours...' : 'Confirmer'}
+            {updateOrderStatusMutation.isLoading ? 'En cours...' : 'Confirmer'}
           </Button>
         </DialogActions>
       </Dialog>

@@ -45,6 +45,7 @@ const DELIVERY_STATUS = {
 };
 
 const DeliveryManagement = () => {
+    // États du composant
     const [deliveries, setDeliveries] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedDelivery, setSelectedDelivery] = useState(null);
@@ -63,23 +64,80 @@ const DeliveryManagement = () => {
         zoneId: '',
         scheduledDate: '',
         items: [],
-        specialInstructions: ''
+        specialInstructions: '',
+        deliveryFee: 0
     });
+    const [deliveryStatus, setDeliveryStatus] = useState('');
+    const [deliveryNote, setDeliveryNote] = useState('');
+    const [notification, setNotification] = useState(null);
 
     useEffect(() => {
         loadDeliveries();
         loadDeliveryZones();
     }, []);
 
+    // Charger les livraisons
     const loadDeliveries = async () => {
         try {
             setLoading(true);
             const response = await DeliveryService.getAllDeliveries();
             setDeliveries(response);
         } catch (error) {
-            showSnackbar('Erreur lors du chargement des livraisons', 'error');
+            setSnackbar({
+                open: true,
+                message: 'Erreur lors du chargement des livraisons',
+                severity: 'error'
+            });
         } finally {
             setLoading(false);
+        }
+    };
+
+    // Calculer les frais de livraison
+    const calculateDeliveryFee = (zoneId, distance = 0) => {
+        const zone = zones.find(z => z.id === zoneId);
+        if (!zone) return 0;
+        
+        // Frais de base + frais par km
+        return zone.baseFee + (distance * zone.additionalFeePerKm);
+    };
+
+    // Mettre à jour les frais de livraison
+    const updateDeliveryFee = async (deliveryId, newFee) => {
+        try {
+            await DeliveryService.updateDeliveryFee(deliveryId, newFee);
+            setSnackbar({
+                open: true,
+                message: 'Frais de livraison mis à jour avec succès',
+                severity: 'success'
+            });
+        } catch (error) {
+            setSnackbar({
+                open: true,
+                message: 'Erreur lors de la mise à jour des frais',
+                severity: 'error'
+            });
+        }
+    };
+
+    // Envoyer une notification de livraison
+    const sendDeliveryNotification = async (deliveryId, message, type) => {
+        try {
+            await DeliveryService.sendDeliveryNotification(deliveryId, {
+                message,
+                type
+            });
+            setSnackbar({
+                open: true,
+                message: 'Notification envoyée avec succès',
+                severity: 'success'
+            });
+        } catch (error) {
+            setSnackbar({
+                open: true,
+                message: 'Erreur lors de l\'envoi de la notification',
+                severity: 'error'
+            });
         }
     };
 

@@ -4,12 +4,20 @@ import { EventEmitter } from 'events';
 const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const eventEmitter = new EventEmitter();
 
+// Vérifier si l'URL de base est valide
+if (!API_BASE_URL.startsWith('http://') && !API_BASE_URL.startsWith('https://')) {
+  throw new Error('URL de l\'API invalide. Vérifiez la variable REACT_APP_API_URL');
+}
+
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
   },
   timeout: 10000,
+  validateStatus: function (status) {
+    return status >= 200 && status < 300; // default
+  }
 });
 
 axiosInstance.interceptors.request.use((config) => {
@@ -100,6 +108,11 @@ export const productService = {
 
   deleteProduct: async (id) => {
     try {
+      // Vérifier que l'ID est un nombre valide
+      if (isNaN(id)) {
+        throw new Error('ID de produit invalide');
+      }
+
       const response = await axiosInstance.delete(`/api/products/${id}`);
       emitProductEvent('deleted', { id });
       return response.data;
@@ -109,15 +122,20 @@ export const productService = {
       let errorMessage = 'Erreur lors de la suppression';
       let status = error.response?.status || 500;
       
-      if (status === 404) {
+      // Analyser les différents types d'erreurs possibles
+      if (error.code === 'ERR_INVALID_URL') {
+        errorMessage = 'URL de l\'API invalide. Vérifiez la configuration.';
+        status = 400;
+      } else if (status === 404) {
         errorMessage = 'Produit non trouvé';
       } else if (error.response?.data?.message?.includes('contrainte')) {
         errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
-      } else if (error.code === 'ERR_INVALID_URL') {
-        errorMessage = 'URL invalide pour l\'API';
-        status = 400;
+      } else if (error.response?.data?.message?.includes('stock')) {
+        errorMessage = 'Impossible de supprimer - produit en stock';
+      } else if (error.response?.data?.message?.includes('reference')) {
+        errorMessage = 'Impossible de supprimer - produit référencé dans d\'autres entités';
       }
-
+      
       throw {
         message: errorMessage,
         status: status,
@@ -126,7 +144,6 @@ export const productService = {
       };
     }
   },
-
   uploadImage: async (id, file) => {
     try {
       const formData = new FormData();
@@ -139,8 +156,17 @@ export const productService = {
           headers: {
             'Content-Type': 'multipart/form-data',
           },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+            console.log(`Upload progress: ${percentCompleted}%`);
+          }
         }
       );
+      
+      if (!response.data?.image) {
+        throw new Error('L\'image n\'a pas été correctement sauvegardée');
+      }
+
       emitProductEvent('updated', response.data);
       return response.data;
     } catch (error) {
@@ -173,7 +199,7 @@ export const productService = {
 
   getPromotionalProducts: async () => {
     try {
-      const response = await axiosInstance.get('/api/products/promotions');
+      const response = await axiosInstance.get('/api/products?promotion=true');
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération des promotions:', error);

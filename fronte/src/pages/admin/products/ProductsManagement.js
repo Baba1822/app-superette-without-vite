@@ -26,6 +26,7 @@ import {
   FormLabel,
   Grid,
   IconButton,
+  Input,
   InputAdornment,
   InputLabel,
   Paper,
@@ -369,8 +370,12 @@ const ProductsManagement = () => {
         errorMessage = 'Produit non trouvé';
       } else if (error.message.includes('contrainte') || error.message.includes('référencé')) {
         errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
+      } else if (error.message.includes('stock')) {
+        errorMessage = 'Impossible de supprimer - produit en stock';
+      } else if (error.message.includes('URL')) {
+        errorMessage = 'Configuration de l\'API invalide. Vérifiez REACT_APP_API_URL';
       }
-
+      
       toast.error(errorMessage);
       
       // Si le produit n'existe plus, on actualise la liste
@@ -478,7 +483,7 @@ const ProductsManagement = () => {
               <Table>
                 <TableHead>
                   <TableRow>
-                    <TableCell>Image</TableCell>
+                    <TableCell sx={{ width: '10%' }}>Image</TableCell>
                     <TableCell>Nom</TableCell>
                     <TableCell>Catégorie</TableCell>
                     <TableCell>Prix</TableCell>
@@ -728,6 +733,42 @@ const ProductsManagement = () => {
                       multiline
                       rows={3}
                     />
+                  </Grid>
+
+                  <Grid item xs={12} md={6}>
+                    <FormControl fullWidth>
+                      <InputLabel>Image</InputLabel>
+                      <TextField
+                        type="file"
+                        onChange={(e) => {
+                          const file = e.target.files[0];
+                          if (file) {
+                            setImageFile(file);
+                            // Prévisualisation de l'image
+                            const reader = new FileReader();
+                            reader.onload = (e) => {
+                              setForm(prev => ({ ...prev, image: e.target.result }));
+                            };
+                            reader.readAsDataURL(file);
+                          }
+                        }}
+                        inputProps={{ accept: 'image/*' }}
+                        fullWidth
+                        variant="outlined"
+                        InputProps={{
+                          disableUnderline: true
+                        }}
+                      />
+                      {form.image && (
+                        <Box sx={{ mt: 2 }}>
+                          <Avatar
+                            src={form.image}
+                            sx={{ width: 100, height: 100 }}
+                            variant="rounded"
+                          />
+                        </Box>
+                      )}
+                    </FormControl>
                   </Grid>
 
                   <Grid item xs={12}>
