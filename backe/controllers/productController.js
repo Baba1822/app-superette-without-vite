@@ -256,13 +256,17 @@ exports.uploadImage = async (req, res) => {
       });
     }
 
-    const imagePath = `/uploads/${req.file.filename}`;
+    // Construire le chemin complet de l'image
+    const imagePath = `/uploads/products/${req.file.filename}`;
     await Product.update(req.params.id, { image: imagePath });
 
+    // Construire l'URL complète de l'image
+    const imageUrl = `${process.env.API_URL}${imagePath}`;
+    
     res.json({
       success: true,
       message: 'Image téléchargée avec succès',
-      imageUrl: imagePath
+      imageUrl: imageUrl
     });
   } catch (error) {
     console.error('Erreur dans uploadImage:', error);

@@ -99,7 +99,7 @@ const ProductsManagement = () => {
     stock: '',
     description: '',
     stock_min: '5',
-    image: '',
+    image_url: '',
     saison: false,
     date_debut_saison: null,
     date_fin_saison: null,
@@ -142,15 +142,10 @@ const ProductsManagement = () => {
     mutationFn: productService.createProduct,
     onSuccess: (data) => {
       if (imageFile) {
-        productService.uploadImage(data.id, imageFile)
-          .then(() => {
-            queryClient.invalidateQueries(['products']);
-            toast.success('Produit créé avec image');
-          })
-          .catch(uploadError => {
-            console.error('Erreur upload:', uploadError);
-            toast.warning('Produit créé mais erreur lors de l\'upload de l\'image');
-          });
+        // Mettre à jour le champ image_url avec l'URL de l'image uploadée
+        setForm(prev => ({ ...prev, image_url: data.image_url }));
+        queryClient.invalidateQueries(['products']);
+        toast.success('Produit créé avec image');
       } else {
         queryClient.invalidateQueries(['products']);
       }
@@ -166,15 +161,11 @@ const ProductsManagement = () => {
     mutationFn: ({ id, ...data }) => productService.updateProduct(id, data),
     onSuccess: (data, variables) => {
       if (imageFile) {
-        productService.uploadImage(variables.id, imageFile)
-          .then(() => {
-            queryClient.invalidateQueries(['products']);
-            toast.success('Produit et image mis à jour');
-          })
-          .catch(uploadError => {
-            console.error('Erreur upload:', uploadError);
-            toast.warning('Produit mis à jour mais erreur lors de l\'upload de l\'image');
-          });
+        // Construire l'URL complète de l'image
+        const imageUrl = `${process.env.REACT_APP_API_URL}/uploads/products/${data.image}`;
+        setForm(prev => ({ ...prev, image_url: imageUrl }));
+        queryClient.invalidateQueries(['products']);
+        toast.success('Produit et image mis à jour');
       } else {
         queryClient.invalidateQueries(['products']);
       }

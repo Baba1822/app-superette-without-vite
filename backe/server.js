@@ -5,6 +5,7 @@ const errorHandler = require('./utils/errorHandler');
 const { validate } = require('./utils/validators');
 const pool = require('./config/database');
 const path = require('path');
+const fs = require('fs');
 
 // Configuration du port
 const PORT = process.env.PORT || 5000;
@@ -39,8 +40,14 @@ app.use(express.urlencoded({
     parameterLimit: 50000
 }));
 
+// Créer le dossier uploads/products s'il n'existe pas
+const uploadsDir = path.join(__dirname, 'uploads', 'products');
+fs.mkdir(uploadsDir, { recursive: true }, (err) => {
+  if (err) console.error('Erreur lors de la création du dossier uploads:', err);
+});
+
 // Middleware pour servir les fichiers statiques
-app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+app.use('/uploads/products', express.static(path.join(__dirname, 'uploads', 'products')));
 
 // Routes pour les images
 app.post('/api/products/:id/image', upload.single('image'), async (req, res) => {
