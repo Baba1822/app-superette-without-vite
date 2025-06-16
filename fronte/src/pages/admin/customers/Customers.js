@@ -21,12 +21,13 @@ import {
   MenuItem,
   TablePagination,
   CircularProgress,
-  Alert
+  Alert,
+  Fab
 } from '@mui/material';
 import {
   Delete as DeleteIcon,
   Edit as EditIcon,
-  Visibility as VisibilityIcon,
+  Add as AddIcon,
   Block as BlockIcon,
   CheckCircle as CheckCircleIcon
 } from '@mui/icons-material';
@@ -41,8 +42,13 @@ function Customers() {
   const [page, setPage] = useState(0);
   const [selectedCustomer, setSelectedCustomer] = useState(null);
   const [viewMode, setViewMode] = useState('list');
-  const [customerStats, setCustomerStats] = useState(null);
-  const [editFormData, setEditFormData] = useState({});
+  const [formData, setFormData] = useState({
+    prenom: '',
+    nom: '',
+    email: '',
+    telephone: '',
+    adresse: ''
+  });
 
   const { 
     data: customers = [], 
@@ -55,25 +61,15 @@ function Customers() {
     staleTime: 5 * 60 * 1000
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: ({ id, status }) => customerService.updateCustomerStatus(id, status),
+  const createCustomerMutation = useMutation({
+    mutationFn: (data) => customerService.createCustomer(data),
     onSuccess: () => {
       queryClient.invalidateQueries(['customers']);
-      toast.success('Statut du client mis à jour avec succès');
+      toast.success('Client ajouté avec succès');
+      handleCloseDialog();
     },
     onError: (error) => {
-      toast.error(`Erreur lors de la mise à jour du statut: ${error.message}`);
-    }
-  });
-
-  const deleteMutation = useMutation({
-    mutationFn: (id) => customerService.deleteCustomer(id),
-    onSuccess: () => {
-      queryClient.invalidateQueries(['customers']);
-      toast.success('Client supprimé avec succès');
-    },
-    onError: (error) => {
-      toast.error(`Erreur lors de la suppression du client: ${error.message}`);
+      toast.error(`Erreur lors de l'ajout du client: ${error.message}`);
     }
   });
 
@@ -89,28 +85,38 @@ function Customers() {
     }
   });
 
-  const loadCustomerStats = async (customerId) => {
-    try {
-      const stats = await customerService.getCustomerStats(customerId);
-      setCustomerStats(stats);
-    } catch (error) {
-      console.error('Error loading customer stats:', error);
-      toast.error('Erreur lors du chargement des statistiques');
+  const deleteCustomerMutation = useMutation({
+    mutationFn: (id) => customerService.deleteCustomer(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries(['customers']);
+      toast.success('Client supprimé avec succès');
+    },
+    onError: (error) => {
+      toast.error(`Erreur lors de la suppression du client: ${error.message}`);
     }
-  };
+  });
 
-  const handleViewCustomer = async (customer) => {
-    setSelectedCustomer(customer);
-    setViewMode('details');
-    await loadCustomerStats(customer.id);
+  const handleAddCustomer = () => {
+    setSelectedCustomer(null);
+    setFormData({
+      prenom: '',
+      nom: '',
+      email: '',
+      telephone: '',
+      adresse: '',
+      status: 'pending'
+    });
+    setViewMode('edit');
   };
 
   const handleEditCustomer = (customer) => {
     setSelectedCustomer(customer);
-    setEditFormData({
+    setFormData({
       prenom: customer.prenom || '',
       nom: customer.nom || '',
       email: customer.email,
+      telephone: customer.telephone || '',
+      adresse: customer.adresse || '',
       status: customer.status || 'pending'
     });
     setViewMode('edit');
@@ -118,34 +124,49 @@ function Customers() {
 
   const handleDeleteCustomer = async (id) => {
     if (window.confirm('Êtes-vous sûr de vouloir supprimer ce client ?')) {
-      await deleteMutation.mutateAsync(id);
+      await deleteCustomerMutation.mutateAsync(id);
     }
   };
 
-  const handleUpdateStatus = async (id, newStatus) => {
-    await updateStatusMutation.mutateAsync({ id, status: newStatus });
-  };
-
-  const handleCloseDialog = () => {
-    setSelectedCustomer(null);
-    setViewMode('list');
-    setCustomerStats(null);
-    setEditFormData({});
-  };
-
-  const handleEditFormChange = (e) => {
+  const handleFormChange = (e) => {
     const { name, value } = e.target;
-    setEditFormData(prev => ({
+    setFormData(prev => ({
       ...prev,
       [name]: value
     }));
   };
 
   const handleSaveCustomer = async () => {
-    if (!selectedCustomer) return;
-    await updateCustomerMutation.mutateAsync({
-      id: selectedCustomer.id,
-      data: editFormData
+    if (!validateForm()) return;
+
+    if (selectedCustomer) {
+      await updateCustomerMutation.mutateAsync({
+        id: selectedCustomer.id,
+        data: formData
+      });
+    } else {
+      await createCustomerMutation.mutateAsync(formData);
+    }
+  };
+
+  const validateForm = () => {
+    if (!formData.prenom.trim() || !formData.nom.trim() || !formData.email.trim()) {
+      toast.error('Veuillez remplir les champs obligatoires (Prénom, Nom et Email)');
+      return false;
+    }
+    return true;
+  };
+
+  const handleCloseDialog = () => {
+    setSelectedCustomer(null);
+    setViewMode('list');
+    setFormData({
+      prenom: '',
+      nom: '',
+      email: '',
+      telephone: '',
+      adresse: '',
+      status: 'pending'
     });
   };
 
@@ -182,6 +203,12 @@ function Customers() {
         Gestion des Clients
       </Typography>
 
+      <Box sx={{ display: 'flex', justifyContent: 'flex-end', mb: 2 }}>
+        <Fab color="primary" onClick={handleAddCustomer}>
+          <AddIcon />
+        </Fab>
+      </Box>
+
       <TableContainer component={Paper}>
         <Table>
           <TableHead>
@@ -189,7 +216,7 @@ function Customers() {
               <TableCell>ID</TableCell>
               <TableCell>Nom</TableCell>
               <TableCell>Email</TableCell>
-              <TableCell>Date d'inscription</TableCell>
+              <TableCell>Téléphone</TableCell>
               <TableCell>Statut</TableCell>
               <TableCell>Actions</TableCell>
             </TableRow>
@@ -202,25 +229,11 @@ function Customers() {
                   <TableCell>{customer.id}</TableCell>
                   <TableCell>{`${customer.prenom || ''} ${customer.nom || ''}`}</TableCell>
                   <TableCell>{customer.email}</TableCell>
-                  <TableCell>
-                    {new Date(customer.date_inscription || customer.createdAt).toLocaleDateString()}
-                  </TableCell>
+                  <TableCell>{customer.telephone || 'Non renseigné'}</TableCell>
                   <TableCell>{getStatusChip(customer.status)}</TableCell>
                   <TableCell>
-                    <IconButton onClick={() => handleViewCustomer(customer)} color="primary">
-                      <VisibilityIcon />
-                    </IconButton>
                     <IconButton onClick={() => handleEditCustomer(customer)} color="primary">
                       <EditIcon />
-                    </IconButton>
-                    <IconButton
-                      onClick={() => handleUpdateStatus(
-                        customer.id,
-                        customer.status === 'active' ? 'inactive' : 'active'
-                      )}
-                      color={customer.status === 'active' ? 'error' : 'success'}
-                    >
-                      {customer.status === 'active' ? <BlockIcon /> : <CheckCircleIcon />}
                     </IconButton>
                     <IconButton onClick={() => handleDeleteCustomer(customer.id)} color="error">
                       <DeleteIcon />
@@ -240,99 +253,93 @@ function Customers() {
         />
       </TableContainer>
 
-      <Dialog open={!!selectedCustomer} onClose={handleCloseDialog} maxWidth="md" fullWidth>
+      <Dialog open={viewMode === 'edit'} onClose={handleCloseDialog} maxWidth="md" fullWidth>
         <DialogTitle>
-          {viewMode === 'details' ? 'Détails du Client' : 'Modifier le Client'}
+          {selectedCustomer ? 'Modifier le Client' : 'Ajouter un Client'}
         </DialogTitle>
         <DialogContent dividers>
-          {viewMode === 'details' ? (
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Informations personnelles
-                </Typography>
-                <Typography><strong>Nom:</strong> {selectedCustomer?.prenom || ''} {selectedCustomer?.nom || ''}</Typography>
-                <Typography><strong>Email:</strong> {selectedCustomer?.email}</Typography>
-                <Typography><strong>Téléphone:</strong> {selectedCustomer?.telephone || 'Non renseigné'}</Typography>
-                <Typography><strong>Adresse:</strong> {selectedCustomer?.adresse || 'Non renseignée'}</Typography>
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <Typography variant="h6" gutterBottom>
-                  Statistiques
-                </Typography>
-                {customerStats ? (
-                  <>
-                    <Typography><strong>Nombre de commandes:</strong> {customerStats.totalOrders || 0}</Typography>
-                    <Typography><strong>Montant total des achats:</strong> {customerStats.totalSpent?.toFixed(2) || '0.00'} €</Typography>
-                    <Typography><strong>Dernière commande:</strong> {customerStats.lastOrderDate ? new Date(customerStats.lastOrderDate).toLocaleDateString() : 'Aucune commande'}</Typography>
-                  </>
-                ) : (
-                  <CircularProgress size={20} />
-                )}
-              </Grid>
+          <Grid container spacing={2}>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                name="prenom"
+                label="Prénom *"
+                value={formData.prenom}
+                onChange={handleFormChange}
+                margin="normal"
+              />
             </Grid>
-          ) : (
-            <Grid container spacing={2}>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  name="prenom"
-                  label="Prénom"
-                  value={editFormData.prenom || ''}
-                  onChange={handleEditFormChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12} md={6}>
-                <TextField
-                  fullWidth
-                  name="nom"
-                  label="Nom"
-                  value={editFormData.nom || ''}
-                  onChange={handleEditFormChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  name="email"
-                  label="Email"
-                  value={editFormData.email || ''}
-                  onChange={handleEditFormChange}
-                  margin="normal"
-                />
-              </Grid>
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  select
-                  name="status"
-                  label="Statut"
-                  value={editFormData.status || 'pending'}
-                  onChange={handleEditFormChange}
-                  margin="normal"
-                >
-                  <MenuItem value="active">Actif</MenuItem>
-                  <MenuItem value="inactive">Inactif</MenuItem>
-                  <MenuItem value="pending">En attente</MenuItem>
-                </TextField>
-              </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                name="nom"
+                label="Nom *"
+                value={formData.nom}
+                onChange={handleFormChange}
+                margin="normal"
+              />
             </Grid>
-          )}
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                name="email"
+                label="Email *"
+                value={formData.email}
+                onChange={handleFormChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                name="telephone"
+                label="Téléphone"
+                value={formData.telephone}
+                onChange={handleFormChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12} md={6}>
+              <TextField
+                fullWidth
+                name="adresse"
+                label="Adresse"
+                value={formData.adresse}
+                onChange={handleFormChange}
+                margin="normal"
+              />
+            </Grid>
+            <Grid item xs={12}>
+              <TextField
+                fullWidth
+                select
+                name="status"
+                label="Statut"
+                value={formData.status}
+                onChange={handleFormChange}
+                margin="normal"
+              >
+                <MenuItem value="active">Actif</MenuItem>
+                <MenuItem value="inactive">Inactif</MenuItem>
+                <MenuItem value="pending">En attente</MenuItem>
+              </TextField>
+            </Grid>
+          </Grid>
         </DialogContent>
         <DialogActions>
-          <Button onClick={handleCloseDialog}>Fermer</Button>
-          {viewMode === 'edit' && (
-            <Button
-              variant="contained"
-              color="primary"
-              onClick={handleSaveCustomer}
-              disabled={updateCustomerMutation.isLoading}
-            >
-              {updateCustomerMutation.isLoading ? <CircularProgress size={24} /> : 'Enregistrer'}
-            </Button>
-          )}
+          <Button onClick={handleCloseDialog}>Annuler</Button>
+          <Button
+            variant="contained"
+            color="primary"
+            onClick={handleSaveCustomer}
+            disabled={
+              !formData.prenom.trim() ||
+              !formData.nom.trim() ||
+              !formData.email.trim()
+            }
+          >
+            {selectedCustomer ? 'Mettre à jour' : 'Ajouter'}
+          </Button>
         </DialogActions>
       </Dialog>
     </Box>

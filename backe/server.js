@@ -20,8 +20,9 @@ const { register, login, getCurrentUser } = require('./controllers/authControlle
 const app = express();
 
 // Configuration CORS avec options détaillées
+const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
 app.use(cors({
-    origin: '*', // Pour le développement
+    origin: frontendUrl,
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
     allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With']

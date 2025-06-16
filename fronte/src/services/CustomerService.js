@@ -1,18 +1,18 @@
 import axios from 'axios';
+import { toast } from 'react-toastify';
 
 class CustomerService {
   constructor() {
     // Configuration de l'URL de base
     this.baseUrl = process.env.REACT_APP_API_URL || 'http://localhost:5000';
-    this.apiUrl = `${this.baseUrl}/api/customers`;
     
-    console.log('CustomerService initialisé avec URL:', this.apiUrl);
+    console.log('CustomerService initialisé avec URL:', this.baseUrl);
     
     // Création de l'instance axios avec configuration optimisée
     this.axiosInstance = axios.create({
       baseURL: this.baseUrl,
-      timeout: 10000, // 10 secondes de timeout
-      withCredentials: true,
+      timeout: 30000, // Augmenter le timeout à 30 secondes
+      withCredentials: false,
       headers: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'
@@ -31,6 +31,7 @@ class CustomerService {
       },
       (error) => {
         console.error('Erreur dans l\'intercepteur de requête:', error);
+        toast.error('Erreur lors de la requête');
         return Promise.reject(error);
       }
     );
@@ -43,11 +44,26 @@ class CustomerService {
       },
       (error) => {
         console.error('Erreur dans l\'intercepteur de réponse:', error);
+        
+        // Gestion des différents types d'erreurs
+        const errorMessage = error.response?.data?.message || error.message;
+        
+        // Gérer les cas spécifiques
         if (error.response?.status === 401) {
           console.warn('Token expiré ou invalide, redirection vers login');
           localStorage.removeItem('token');
+          toast.error('Session expirée. Veuillez vous reconnecter.');
+          throw new Error('Session expirée. Veuillez vous reconnecter.');
         }
-        return Promise.reject(error);
+        
+        if (!error.response) {
+          // Erreur réseau
+          toast.error('Erreur de réseau - Le serveur ne répond pas.');
+          throw new Error('Erreur de réseau - Le serveur ne répond pas.');
+        }
+        
+        toast.error(errorMessage);
+        throw new Error(errorMessage);
       }
     );
   }
