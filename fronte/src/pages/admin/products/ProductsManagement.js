@@ -136,13 +136,11 @@ const ProductsManagement = () => {
     }
   });
 
-
   // Mutation pour la création
   const createMutation = useMutation({
     mutationFn: productService.createProduct,
     onSuccess: (data) => {
       if (imageFile) {
-        // Mettre à jour le champ image_url avec l'URL de l'image uploadée
         setForm(prev => ({ ...prev, image_url: data.image_url }));
         queryClient.invalidateQueries(['products']);
         toast.success('Produit créé avec image');
@@ -156,12 +154,12 @@ const ProductsManagement = () => {
       toast.error(error.message || 'Erreur lors de la création');
     }
   });
+
   // Mutation pour la mise à jour
   const updateMutation = useMutation({
     mutationFn: ({ id, ...data }) => productService.updateProduct(id, data),
     onSuccess: (data, variables) => {
       if (imageFile) {
-        // Construire l'URL complète de l'image
         const imageUrl = `${process.env.REACT_APP_API_URL}/uploads/products/${data.image}`;
         setForm(prev => ({ ...prev, image_url: imageUrl }));
         queryClient.invalidateQueries(['products']);
@@ -202,7 +200,6 @@ const ProductsManagement = () => {
     setPage(0);
   };
 
-
   const handleOpenDialog = (item = null) => {
     if (item) {
       setForm({
@@ -241,14 +238,75 @@ const ProductsManagement = () => {
     setErrors({});
   };
 
-  const handleInputChange = (e) => {
-    const { name, value } = e.target;
-    setForm(prev => ({ ...prev, [name]: value }));
+  const handleSwitchChange = (event) => {
+    const { name, checked } = event.target;
+    setForm(prev => ({ ...prev, [name]: Boolean(checked) }));
   };
 
-  const handleSwitchChange = (e) => {
-    const { name, checked } = e.target;
-    setForm(prev => ({ ...prev, [name]: checked }));
+  const handleInputChange = (event) => {
+    const { name, value } = event.target;
+    if (name === 'prix' || name === 'stock' || name === 'stock_min') {
+      const numValue = parseFloat(value);
+      setForm(prev => ({ ...prev, [name]: isNaN(numValue) ? '' : numValue }));
+    } else if (name === 'valeur_promotion') {
+      const numValue = parseFloat(value);
+      setForm(prev => ({ ...prev, [name]: isNaN(numValue) ? '' : numValue }));
+    } else {
+      setForm(prev => ({ ...prev, [name]: value }));
+    }
+  };
+
+  const prepareFormData = (formData) => {
+    return {
+      ...formData,
+      prix: formData.prix ? parseFloat(formData.prix) : null,
+      stock: formData.stock ? parseInt(formData.stock) : null,
+      stock_min: formData.stock_min ? parseInt(formData.stock_min) : null,
+      valeur_promotion: formData.promotion ? parseFloat(formData.valeur_promotion) : null,
+      saison: Boolean(formData.saison),
+      promotion: Boolean(formData.promotion),
+      date_debut_saison: formData.date_debut_saison || null,
+      date_fin_saison: formData.date_fin_saison || null,
+      date_debut_promo: formData.date_debut_promo || null,
+      date_fin_promo: formData.date_fin_promo || null,
+      date_peremption: formData.date_peremption || null
+    };
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    if (!validateForm()) return;
+
+    const productData = prepareFormData(form);
+
+    try {
+      let productId;
+      
+      if (!selectedProduct) {
+        const createdProduct = await createMutation.mutateAsync(productData);
+        productId = createdProduct.id;
+      } else {
+        await updateMutation.mutateAsync({ id: selectedProduct.id, ...productData });
+        productId = selectedProduct.id;
+      }
+
+      if (imageFile) {
+        try {
+          await productService.uploadImage(productId, imageFile);
+          queryClient.invalidateQueries(['products']);
+          toast.success('Image téléchargée avec succès');
+        } catch (uploadError) {
+          console.error('Erreur upload:', uploadError);
+          toast.warning('Produit sauvegardé mais erreur lors de l\'upload de l\'image');
+        }
+      }
+
+      handleCloseDialog();
+      toast.success(`Produit ${selectedProduct ? 'mis à jour' : 'créé'} avec succès`);
+    } catch (error) {
+      console.error('Erreur lors de la soumission:', error);
+      toast.error(error.message || 'Une erreur est survenue');
+    }
   };
 
   const handleImageChange = (e) => {
@@ -295,87 +353,53 @@ const ProductsManagement = () => {
     return Object.keys(newErrors).length === 0;
   };
 
-  const handleSubmit = async (e) => {
-  e.preventDefault();
-  if (!validateForm()) return;
-
-    const productData = {
-      ...form,
-      prix: parseFloat(form.prix),
-      stock: parseInt(form.stock),
-      stock_min: parseInt(form.stock_min),
-      valeur_promotion: form.promotion ? parseFloat(form.valeur_promotion) : null,
-      date_debut_saison: form.saison ? form.date_debut_saison : null,
-      date_fin_saison: form.saison ? form.date_fin_saison : null,
-      date_debut_promo: form.promotion ? form.date_debut_promo : null,
-      date_fin_promo: form.promotion ? form.date_fin_promo : null,
-      date_peremption: form.date_peremption,
-    };
-
+  const deleteProduct = async (id) => {
+    if (window.confirm(`Êtes-vous sûr de vouloir supprimer le produit #${id} ?`)) {
       try {
-    let productId;
-    
-    if (!selectedProduct) {
-      // Create new product
-      const createdProduct = await createMutation.mutateAsync(productData);
-      productId = createdProduct.id;
-    } else {
-      // Update existing product
-      await updateMutation.mutateAsync({ id: selectedProduct.id, ...productData });
-      productId = selectedProduct.id;
-    }
-
-    // Upload image if there is one
-    if (imageFile) {
-      try {
-        await productService.uploadImage(productId, imageFile);
+        await productService.deleteProduct(id);
+        toast.success(`Produit #${id} supprimé avec succès`);
         queryClient.invalidateQueries(['products']);
-        toast.success('Image téléchargée avec succès');
-      } catch (uploadError) {
-        console.error('Erreur upload:', uploadError);
-        toast.warning('Produit sauvegardé mais erreur lors de l\'upload de l\'image');
+      } catch (error) {
+        console.error('Erreur lors de la suppression:', error);
+        
+        let errorMessage = error.message || 'Erreur lors de la suppression';
+        let errorDetails = error.details || '';
+        
+        if (error.status === 500) {
+          errorMessage = 'Erreur serveur - veuillez réessayer plus tard';
+        } else if (error.status === 404) {
+          errorMessage = 'Produit non trouvé';
+        } else if (error.message.includes('contrainte') || error.message.includes('référencé')) {
+          errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
+        } else if (error.message.includes('stock')) {
+          errorMessage = 'Impossible de supprimer - produit en stock';
+        } else if (error.message.includes('URL')) {
+          errorMessage = 'Configuration de l\'API invalide. Vérifiez REACT_APP_API_URL';
+        }
+        
+        if (errorDetails) {
+          errorMessage += `\nDétails: ${errorDetails}`;
+        }
+        
+        console.error('Détails de l\'erreur:', {
+          status: error.status,
+          message: error.message,
+          details: errorDetails,
+          productId: error.productId
+        });
+        
+        toast.error(errorMessage);
+        
+        if (error.status === 404) {
+          queryClient.invalidateQueries(['products']);
+        } else {
+          setTimeout(() => {
+            queryClient.invalidateQueries(['products']);
+          }, 2000);
+        }
       }
     }
-
-    handleCloseDialog();
-    toast.success(`Produit ${selectedProduct ? 'mis à jour' : 'créé'} avec succès`);
-  } catch (error) {
-    console.error('Error submitting form:', error);
-    toast.error(error.message || 'Une erreur est survenue');
-  }
-};
- const deleteProduct = async (id) => {
-  if (window.confirm(`Êtes-vous sûr de vouloir supprimer le produit #${id} ?`)) {
-    try {
-      await productService.deleteProduct(id);
-      toast.success(`Produit #${id} supprimé avec succès`);
-      queryClient.invalidateQueries(['products']);
-    } catch (error) {
-      console.error('Erreur lors de la suppression:', error);
-      
-      let errorMessage = error.message || 'Erreur lors de la suppression';
-      
-      if (error.status === 500) {
-        errorMessage = 'Erreur serveur - veuillez réessayer plus tard';
-      } else if (error.status === 404) {
-        errorMessage = 'Produit non trouvé';
-      } else if (error.message.includes('contrainte') || error.message.includes('référencé')) {
-        errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
-      } else if (error.message.includes('stock')) {
-        errorMessage = 'Impossible de supprimer - produit en stock';
-      } else if (error.message.includes('URL')) {
-        errorMessage = 'Configuration de l\'API invalide. Vérifiez REACT_APP_API_URL';
-      }
-      
-      toast.error(errorMessage);
-      
-      // Si le produit n'existe plus, on actualise la liste
-      if (error.status === 404) {
-        queryClient.invalidateQueries(['products']);
-      }
-    }
-  }
-};
+  };
 
   const formatPrice = (price) => {
     return new Intl.NumberFormat('fr-FR', {
@@ -735,7 +759,6 @@ const ProductsManagement = () => {
                           const file = e.target.files[0];
                           if (file) {
                             setImageFile(file);
-                            // Prévisualisation de l'image
                             const reader = new FileReader();
                             reader.onload = (e) => {
                               setForm(prev => ({ ...prev, image: e.target.result }));

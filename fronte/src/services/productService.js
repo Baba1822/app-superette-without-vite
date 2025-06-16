@@ -5,35 +5,81 @@ const API_BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:5000';
 const eventEmitter = new EventEmitter();
 
 // Vérifier si l'URL de base est valide
+if (!API_BASE_URL) {
+  console.error('REACT_APP_API_URL n\'est pas défini');
+  throw new Error('REACT_APP_API_URL n\'est pas défini');
+}
+
 if (!API_BASE_URL.startsWith('http://') && !API_BASE_URL.startsWith('https://')) {
+  console.error('URL de l\'API invalide:', API_BASE_URL);
   throw new Error('URL de l\'API invalide. Vérifiez la variable REACT_APP_API_URL');
+}
+
+// Ajouter une vérification supplémentaire de l'URL
+try {
+  const url = new URL(API_BASE_URL);
+  console.log('URL de l\'API validée:', url);
+  if (!url.hostname) {
+    throw new Error('URL invalide: aucun hostname');
+  }
+  if (!url.port) {
+    throw new Error('URL invalide: aucun port spécifié');
+  }
+} catch (e) {
+  console.error('Erreur de validation de l\'URL:', e);
+  throw new Error('URL de l\'API invalide: ' + e.message);
 }
 
 const axiosInstance = axios.create({
   baseURL: API_BASE_URL,
   headers: {
     'Content-Type': 'application/json',
+    'Accept': 'application/json'
   },
-  timeout: 10000,
+  timeout: 30000, // Augmenter le timeout à 30 secondes
   validateStatus: function (status) {
     return status >= 200 && status < 300; // default
   }
 });
 
-axiosInstance.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
+axiosInstance.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => {
+    return Promise.reject(error);
   }
-  return config;
-});
+);
 
 axiosInstance.interceptors.response.use(
   (response) => response,
   (error) => {
     if (error.code === 'ECONNABORTED') {
       error.message = 'La requête a expiré';
+    } else if (error.response) {
+      // Le serveur a répondu avec un statut d'erreur
+      if (error.response.data && error.response.data.message) {
+        error.message = error.response.data.message;
+      }
+    } else if (error.request) {
+      // La requête a été faite mais pas de réponse reçue
+      error.message = 'Impossible de se connecter au serveur';
+    } else {
+      // Erreur lors de la configuration de la requête
+      error.message = 'Erreur de configuration de la requête';
     }
+    
+    // Ajouter plus de détails pour le debug
+    console.error('Erreur API:', {
+      status: error.response?.status,
+      message: error.message,
+      details: error.response?.data
+    });
+    
     return Promise.reject(error);
   }
 );
@@ -113,6 +159,10 @@ export const productService = {
         throw new Error('ID de produit invalide');
       }
 
+      // Ajouter des logs avant l'appel API
+      console.log('Suppression du produit:', id);
+      console.log('URL de la requête:', `${API_BASE_URL}/api/products/${id}`);
+
       const response = await axiosInstance.delete(`/api/products/${id}`);
       emitProductEvent('deleted', { id });
       return response.data;
@@ -132,18 +182,34 @@ export const productService = {
         errorMessage = 'Impossible de supprimer - produit utilisé dans des commandes';
       } else if (error.response?.data?.message?.includes('stock')) {
         errorMessage = 'Impossible de supprimer - produit en stock';
-      } else if (error.response?.data?.message?.includes('reference')) {
-        errorMessage = 'Impossible de supprimer - produit référencé dans d\'autres entités';
+      } else if (error.response?.data?.message?.includes('fichier')) {
+        errorMessage = 'Erreur lors de la suppression des fichiers associés';
+      } else if (status === 500) {
+        errorMessage = 'Erreur serveur - veuillez réessayer plus tard';
+      } else {
+        errorMessage = error.response?.data?.message || 'Erreur lors de la suppression';
       }
-      
+
+      // Ajouter plus de détails dans les logs
+      console.error('Détails de l\'erreur de suppression:', {
+        status: status,
+        message: error.message,
+        response: error.response?.data,
+        productId: id,
+        requestURL: `${API_BASE_URL}/api/products/${id}`,
+        timestamp: new Date().toISOString()
+      });
+
       throw {
         message: errorMessage,
+        details: error.response?.data,
         status: status,
-        details: error.response?.data?.message || error.message,
-        productId: id
+        productId: id,
+        requestURL: `${API_BASE_URL}/api/products/${id}`
       };
     }
   },
+
   uploadImage: async (id, file) => {
     try {
       const formData = new FormData();

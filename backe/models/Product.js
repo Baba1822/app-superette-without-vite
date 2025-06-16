@@ -99,21 +99,41 @@ class Product {
                 productData.categorie_id, 
                 productData.prix, 
                 productData.stock,
-                productData.description, 
-                productData.stock_min, 
-                productData.image, 
+                productData.description,
+                productData.stock_min || 0,
+                productData.image || 'default-product.jpg',
                 productData.saison || false,
-                productData.date_debut_saison, 
-                productData.date_fin_saison, 
+                productData.date_debut_saison,
+                productData.date_fin_saison,
                 productData.promotion || false,
-                productData.type_promotion, 
-                productData.valeur_promotion, 
-                productData.date_debut_promo, 
+                productData.type_promotion,
+                productData.valeur_promotion,
+                productData.date_debut_promo,
                 productData.date_fin_promo,
                 productData.date_peremption
             ]
         );
         return result.insertId;
+    }
+
+    static async delete(id) {
+        try {
+            // Supprimer les images associées
+            await pool.query('DELETE FROM images WHERE produit_id = ?', [id]);
+            
+            // Supprimer le produit
+            await pool.query('DELETE FROM produits WHERE id = ?', [id]);
+            
+            return true;
+        } catch (error) {
+            console.error('Erreur lors de la suppression du produit:', {
+                message: error.message,
+                stack: error.stack,
+                productId: id,
+                timestamp: new Date().toISOString()
+            });
+            throw error;
+        }
     }
 
     static async update(id, productData) {

@@ -64,10 +64,36 @@ router.put('/:id', auth, async (req, res) => {
 // Supprimer un produit (requiert authentification)
 router.delete('/:id', auth, async (req, res) => {
     try {
-        await pool.query('DELETE FROM produits WHERE id = ?', [req.params.id]);
+        // Vérifier si le produit existe
+        const product = await Product.getById(req.params.id);
+        if (!product) {
+            return res.status(404).json({ error: 'Produit non trouvé' });
+        }
+
+        // Supprimer le produit
+        await Product.delete(req.params.id);
+        
         res.json({ message: 'Produit supprimé avec succès' });
     } catch (error) {
-        res.status(500).json({ error: 'Erreur lors de la suppression du produit' });
+        console.error('Erreur lors de la suppression du produit:', {
+            message: error.message,
+            stack: error.stack,
+            productId: req.params.id,
+            timestamp: new Date().toISOString()
+        });
+
+        // Analyser le type d'erreur
+        if (error.code === 'ER_ROW_IS_REFERENCED_2') {
+            return res.status(400).json({ 
+                error: 'Impossible de supprimer - produit utilisé dans des commandes',
+                details: error.message 
+            });
+        }
+        
+        return res.status(500).json({ 
+            error: 'Erreur lors de la suppression du produit',
+            details: error.message 
+        });
     }
 });
 
