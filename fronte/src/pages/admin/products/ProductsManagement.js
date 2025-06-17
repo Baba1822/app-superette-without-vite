@@ -209,7 +209,7 @@ const ProductsManagement = () => {
         stock: item.stock?.toString() || '',
         description: item.description || '',
         stock_min: item.stock_min?.toString() || '5',
-        image: item.image || '',
+        image_url: item.image_url || '',
         saison: item.saison || false,
         date_debut_saison: item.date_debut_saison ? new Date(item.date_debut_saison) : null,
         date_fin_saison: item.date_fin_saison ? new Date(item.date_fin_saison) : null,
@@ -315,7 +315,7 @@ const ProductsManagement = () => {
       setImageFile(file);
       const reader = new FileReader();
       reader.onload = (event) => {
-        setForm(prev => ({ ...prev, image: event.target.result }));
+        setForm(prev => ({ ...prev, image_url: event.target.result }));
       };
       reader.readAsDataURL(file);
     }
@@ -533,9 +533,9 @@ const ProductsManagement = () => {
                         return (
                           <TableRow key={product.id}>
                             <TableCell>
-                              {product.image ? (
+                              {product.image_url ? (
                                 <Avatar 
-                                  src={product.image} 
+                                  src={product.image_url} 
                                   alt={product.nom} 
                                   sx={{ width: 56, height: 56 }}
                                   variant="rounded"

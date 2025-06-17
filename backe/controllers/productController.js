@@ -65,16 +65,36 @@ class Product {
   }
 
   static async uploadImage(productId, imageFile) {
-    // Mettre à jour le chemin de l'image dans la base de données
-    const imagePath = path.join('/uploads/products', imageFile.filename);
-    await pool.query('UPDATE produits SET image = ? WHERE id = ?', [imagePath, productId]);
-    return imagePath;
+    try {
+      // Construire le chemin complet de l'image
+      const imagePath = path.join('/uploads/products', imageFile.filename);
+      
+      // Vérifier si le dossier existe
+      const uploadDir = path.join(__dirname, '../uploads/products');
+      await fs.mkdir(uploadDir, { recursive: true });
+      
+      // Mettre à jour le produit avec le chemin relatif
+      await pool.query('UPDATE produits SET image_url = ? WHERE id = ?', [imagePath, productId]);
+      
+      // Construire l'URL complète
+      const imageUrl = `${process.env.API_URL}${imagePath}`;
+      
+      return {
+        success: true,
+        message: 'Image téléchargée avec succès',
+        imagePath: imagePath,
+        imageUrl: imageUrl
+      };
+    } catch (error) {
+      console.error('Erreur lors du téléchargement de l\'image:', error);
+      throw new Error('Erreur lors du téléchargement de l\'image');
+    }
   }
 
   static async getImagePath(productId) {
-    const [rows] = await pool.query('SELECT image FROM produits WHERE id = ?', [productId]);
+    const [rows] = await pool.query('SELECT image_url FROM produits WHERE id = ?', [productId]);
     if (rows[0]) {
-      return rows[0].image;
+      return rows[0].image_url;
     }
     return null;
   }
@@ -258,7 +278,7 @@ exports.uploadImage = async (req, res) => {
 
     // Construire le chemin complet de l'image
     const imagePath = `/uploads/products/${req.file.filename}`;
-    await Product.update(req.params.id, { image: imagePath });
+    await Product.update(req.params.id, { image_url: imagePath });
 
     // Construire l'URL complète de l'image
     const imageUrl = `${process.env.API_URL}${imagePath}`;
@@ -266,7 +286,7 @@ exports.uploadImage = async (req, res) => {
     res.json({
       success: true,
       message: 'Image téléchargée avec succès',
-      imageUrl: imageUrl
+      image_url: imageUrl
     });
   } catch (error) {
     console.error('Erreur dans uploadImage:', error);

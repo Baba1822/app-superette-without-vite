@@ -91,7 +91,7 @@ class Product {
 
     static async create(productData) {
         const [result] = await pool.query(
-            'INSERT INTO produits (nom, categorie_id, prix, stock, description, stock_min, image, ' +
+            'INSERT INTO produits (nom, categorie_id, prix, stock, description, stock_min, image_url, ' +
             'saison, date_debut_saison, date_fin_saison, promotion, type_promotion, valeur_promotion, ' +
             'date_debut_promo, date_fin_promo, date_peremption) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
             [
@@ -101,7 +101,7 @@ class Product {
                 productData.stock,
                 productData.description,
                 productData.stock_min || 0,
-                productData.image || 'default-product.jpg',
+                productData.image_url || 'default-product.jpg',
                 productData.saison || false,
                 productData.date_debut_saison,
                 productData.date_fin_saison,
@@ -139,7 +139,7 @@ class Product {
     static async update(id, productData) {
         await pool.query(
             'UPDATE produits SET nom = ?, categorie_id = ?, prix = ?, stock = ?, description = ?, ' +
-            'stock_min = ?, image = ?, saison = ?, date_debut_saison = ?, date_fin_saison = ?, ' +
+            'stock_min = ?, image_url = ?, saison = ?, date_debut_saison = ?, date_fin_saison = ?, ' +
             'promotion = ?, type_promotion = ?, valeur_promotion = ?, date_debut_promo = ?, ' +
             'date_fin_promo = ?, date_peremption = ? WHERE id = ?',
             [
@@ -149,7 +149,7 @@ class Product {
                 productData.stock,
                 productData.description,
                 productData.stock_min,
-                productData.image,
+                productData.image_url,
                 productData.saison,
                 productData.date_debut_saison,
                 productData.date_fin_saison,

@@ -50,37 +50,34 @@ fs.mkdir(uploadsDir, { recursive: true }, (err) => {
 // Middleware pour servir les fichiers statiques
 app.use('/uploads/products', express.static(path.join(__dirname, 'uploads', 'products')));
 
-// Routes pour les images
+// Route pour l'upload d'image
 app.post('/api/products/:id/image', upload.single('image'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({
-        success: false,
-        message: 'Aucun fichier n\'a été téléchargé'
-      });
+      return res.status(400).json({ error: 'Aucun fichier n\'a été envoyé' });
     }
 
-    const productId = parseInt(req.params.id);
-    if (isNaN(productId)) {
-      return res.status(400).json({
-        success: false,
-        message: 'ID de produit invalide'
-      });
+    const productId = req.params.id;
+    const product = await Product.getById(productId);
+
+    if (!product) {
+      return res.status(404).json({ error: 'Produit non trouvé' });
     }
 
-    const imagePath = await Product.uploadImage(productId, req.file);
-    res.status(200).json({
-      success: true,
-      message: 'Image téléchargée avec succès',
-      imagePath: imagePath
-    });
+    // Vérifier et créer le dossier d'upload s'il n'existe pas
+    const uploadDir = path.join(__dirname, 'uploads', 'products');
+    if (!fs.existsSync(uploadDir)) {
+      await fs.mkdir(uploadDir, { recursive: true });
+    }
+
+    // Mettre à jour le chemin de l'image dans la base de données
+    const imagePath = path.join('/uploads/products', req.file.filename);
+    const result = await Product.uploadImage(productId, req.file);
+
+    res.json(result);
   } catch (error) {
     console.error('Erreur lors du téléchargement de l\'image:', error);
-    res.status(500).json({
-      success: false,
-      message: 'Erreur serveur lors du téléchargement de l\'image',
-      error: error.message
-    });
+    res.status(500).json({ error: 'Erreur lors du téléchargement de l\'image' });
   }
 });
 

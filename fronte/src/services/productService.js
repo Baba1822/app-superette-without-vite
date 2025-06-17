@@ -229,12 +229,19 @@ export const productService = {
         }
       );
       
-      if (!response.data?.image) {
+      if (!response.data?.success) {
         throw new Error('L\'image n\'a pas été correctement sauvegardée');
       }
 
-      emitProductEvent('updated', response.data);
-      return response.data;
+      emitProductEvent('updated', {
+        id: id,
+        image_url: response.data.imagePath
+      });
+      
+      return {
+        image_url: response.data.imagePath,
+        imageUrl: response.data.imageUrl
+      };
     } catch (error) {
       console.error(`Erreur lors de l'upload de l'image pour le produit ${id}:`, error);
       throw {
