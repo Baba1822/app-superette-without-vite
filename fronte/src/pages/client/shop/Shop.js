@@ -566,7 +566,13 @@ const Shop = () => {
                 <CardMedia
                   component="img"
                   height="140"
-                  image={product?.image?.startsWith('http') ? product.image : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}/api/products/image/${product.id}`}
+                  image={
+                    product?.image_url 
+                      ? product.image_url.startsWith('http') 
+                        ? product.image_url 
+                        : `${process.env.REACT_APP_API_URL || 'http://localhost:5000'}${product.image_url}`
+                      : '/placeholder-image.jpg'
+                  }
                   alt={product?.nom || 'Produit'}
                   onError={(e) => {
                     e.target.src = '/placeholder-image.jpg';
