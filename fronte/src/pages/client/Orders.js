@@ -1,4 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { orderService } from '../../services/orderService';
 import {
     Box,
     Card,
@@ -23,51 +25,17 @@ import {
 import { Visibility as VisibilityIcon } from '@mui/icons-material';
 
 const ClientOrders = () => {
-    const [orders, setOrders] = useState([]);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState(null);
     const [selectedOrder, setSelectedOrder] = useState(null);
     const [openDialog, setOpenDialog] = useState(false);
 
-    useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                // Simuler un appel API
-                await new Promise(resolve => setTimeout(resolve, 1000));
-                
-                // Données mockées
-                const mockOrders = [
-                    {
-                        id: '1',
-                        date: '2024-03-10',
-                        total: 150000,
-                        status: 'completed',
-                        items: [
-                            { id: 1, name: 'Riz local', quantity: 2, price: 50000 },
-                            { id: 2, name: 'Huile végétale', quantity: 1, price: 50000 }
-                        ]
-                    },
-                    {
-                        id: '2',
-                        date: '2024-03-09',
-                        total: 75000,
-                        status: 'pending',
-                        items: [
-                            { id: 1, name: 'Sucre', quantity: 3, price: 25000 }
-                        ]
-                    }
-                ];
-
-                setOrders(mockOrders);
-            } catch (err) {
-                setError('Erreur lors du chargement des commandes');
-            } finally {
-                setLoading(false);
-            }
-        };
-
-        fetchOrders();
-    }, []);
+    const { data: orders, isLoading, isError, error } = useQuery({
+        queryKey: ['clientOrders'],
+        queryFn: orderService.getOrders,
+        onError: (err) => {
+            console.error('Erreur lors du chargement des commandes:', err);
+        },
+        staleTime: 1000 * 60 * 5, // 5 minutes
+    });
 
     const handleViewDetails = (order) => {
         setSelectedOrder(order);
@@ -85,7 +53,7 @@ const ClientOrders = () => {
         return <Chip label={config.label} color={config.color} size="small" />;
     };
 
-    if (loading) {
+    if (isLoading) {
         return (
             <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
                 <CircularProgress />
@@ -93,10 +61,10 @@ const ClientOrders = () => {
         );
     }
 
-    if (error) {
+    if (isError) {
         return (
             <Box sx={{ p: 3 }}>
-                <Alert severity="error">{error}</Alert>
+                <Alert severity="error">{'Erreur lors du chargement des commandes: ' + error.message}</Alert>
             </Box>
         );
     }
@@ -121,7 +89,7 @@ const ClientOrders = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {orders.map((order) => (
+                                {(orders || []).map((order) => (
                                     <TableRow key={order.id}>
                                         <TableCell>{order.id}</TableCell>
                                         <TableCell>
@@ -143,7 +111,7 @@ const ClientOrders = () => {
                                         </TableCell>
                                     </TableRow>
                                 ))}
-                                {orders.length === 0 && (
+                                {(orders || []).length === 0 && (
                                     <TableRow>
                                         <TableCell colSpan={5} align="center">
                                             <Typography color="textSecondary">
@@ -199,14 +167,6 @@ const ClientOrders = () => {
                                                 </TableCell>
                                             </TableRow>
                                         ))}
-                                        <TableRow>
-                                            <TableCell colSpan={3} align="right">
-                                                <strong>Total</strong>
-                                            </TableCell>
-                                            <TableCell align="right">
-                                                <strong>{selectedOrder.total.toLocaleString()} GNF</strong>
-                                            </TableCell>
-                                        </TableRow>
                                     </TableBody>
                                 </Table>
                             </TableContainer>
@@ -214,9 +174,7 @@ const ClientOrders = () => {
                     )}
                 </DialogContent>
                 <DialogActions>
-                    <Button onClick={() => setOpenDialog(false)}>
-                        Fermer
-                    </Button>
+                    <Button onClick={() => setOpenDialog(false)}>Fermer</Button>
                 </DialogActions>
             </Dialog>
         </Box>

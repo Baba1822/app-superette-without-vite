@@ -6,7 +6,8 @@ const auth = require('../middleware/auth');
 // Créer une nouvelle commande
 router.post('/', auth, async (req, res) => {
     try {
-        const { clientId, items, totalAmount, paymentMethod } = req.body;
+        const { items, totalAmount, paymentMethod, deliveryAddress, deliveryFee, note, deliveryQuarter, phoneNumber } = req.body;
+        const clientId = req.user.userId; // Récupérer l'ID client depuis le token authentifié
         
         // Démarrer une transaction
         const connection = await pool.getConnection();
@@ -15,28 +16,29 @@ router.post('/', auth, async (req, res) => {
         try {
             // Créer la commande
             const [result] = await connection.query(
-                'INSERT INTO commandes (client_id, total_amount, payment_method, status, created_at) VALUES (?, ?, ?, ?, NOW())',
-                [clientId, totalAmount, paymentMethod, 'en_attente']
+                'INSERT INTO commandes (client_id, montant_total, methode_paiement, statut, delivery_address, delivery_fee, note, delivery_quarter, phone_number, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+                [clientId, totalAmount, paymentMethod, 'en_attente', deliveryAddress, deliveryFee, note, deliveryQuarter, phoneNumber]
             );
 
             // Créer les détails de la commande
             const orderId = result.insertId;
-            const orderDetails = items.map(item => ({
-                order_id: orderId,
-                product_id: item.productId,
-                quantity: item.quantity,
-                unit_price: item.price
-            }));
+            const orderDetails = items.map(item => [
+                orderId,
+                item.productId,
+                item.quantity,
+                item.price,
+                item.price * item.quantity
+            ]);
 
             await connection.query(
-                'INSERT INTO order_details (order_id, product_id, quantity, unit_price) VALUES ?'
-                [orderDetails]
+                'INSERT INTO details_commande (commande_id, produit_id, quantite, prix_unitaire, montant_total) VALUES ?',
+                [orderDetails] 
             );
 
             // Mettre à jour le stock
             for (const item of items) {
                 await connection.query(
-                    'UPDATE produits SET stock = stock - ? WHERE id = ?',
+                    'UPDATE produits SET stock_actuel = stock_actuel - ? WHERE id = ?',
                     [item.quantity, item.productId]
                 );
             }
@@ -50,33 +52,65 @@ router.post('/', auth, async (req, res) => {
             connection.release();
         }
     } catch (error) {
-        res.status(500).json({ error: 'Erreur lors de la création de la commande' });
+        console.error('Erreur détaillée lors de la création de la commande:', error); 
+        res.status(500).json({ error: 'Erreur lors de la création de la commande', details: error.message });
     }
 });
 
 // Récupérer toutes les commandes
 router.get('/', auth, async (req, res) => {
     try {
-        const [orders] = await pool.query(
-            'SELECT c.*, cl.nom as client_nom, cl.prenom as client_prenom FROM commandes c LEFT JOIN clients cl ON c.client_id = cl.id ORDER BY c.created_at DESC'
-        );
+        const clientId = req.user.userId; // Récupérer l'ID client depuis le token authentifié
+        const userRole = req.user.role; // Supposons que le rôle est attaché à req.user.role
+
+        let query = 'SELECT c.*, c.date_creation AS date, c.montant_total AS total, cl.nom as client_nom, cl.prenom as client_prenom FROM commandes c LEFT JOIN clients cl ON c.client_id = cl.id';
+        const queryParams = [];
+
+        if (userRole === 'client') {
+            query += ' WHERE c.client_id = ?';
+            queryParams.push(clientId);
+        }
+
+        query += ' ORDER BY c.date_creation DESC';
+
+        const [orders] = await pool.query(query, queryParams);
+
+        for (let order of orders) {
+            order.total = parseFloat(order.total); // Convertir en flottant pour s'assurer que c'est un nombre
+            const [items] = await pool.query(
+                'SELECT od.*, p.nom as product_name FROM details_commande od JOIN produits p ON od.produit_id = p.id WHERE od.commande_id = ?',
+                [order.id]
+            );
+            order.items = items.map(item => ({
+                id: item.produit_id,
+                name: item.product_name,
+                quantity: item.quantite,
+                price: parseFloat(item.prix_unitaire),
+                total: parseFloat(item.montant_total)
+            }));
+        }
+
         res.json(orders);
     } catch (error) {
-        res.status(500).json({ error: 'Erreur lors de la récupération des commandes' });
+        console.error('Erreur détaillée lors de la récupération des commandes:', error); 
+        res.status(500).json({ error: 'Erreur lors de la récupération des commandes', details: error.message });
     }
 });
 
 // Mettre à jour le statut d'une commande
 router.put('/:id/status', auth, async (req, res) => {
     try {
-        const { status } = req.body;
+        const { status, note } = req.body.status; // Extraire status et note de l'objet status
+        const orderId = req.params.id;
+
         await pool.query(
-            'UPDATE commandes SET status = ?, updated_at = NOW() WHERE id = ?',
-            [status, req.params.id]
+            'UPDATE commandes SET statut = ?, note = ?, date_mise_a_jour = NOW() WHERE id = ?',
+            [status, note, orderId]
         );
         res.json({ message: 'Statut de la commande mis à jour' });
     } catch (error) {
-        res.status(500).json({ error: 'Erreur lors de la mise à jour du statut' });
+        console.error('Erreur détaillée lors de la mise à jour du statut:', error); 
+        res.status(500).json({ error: 'Erreur lors de la mise à jour du statut', details: error.message });
     }
 });
 

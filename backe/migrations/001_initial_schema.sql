@@ -3,7 +3,7 @@ CREATE DATABASE IF NOT EXISTS baba;
 USE baba;
 
 -- Table des utilisateurs (employés, clients, administrateurs)
-CREATE TABLE utilisateurs (
+CREATE TABLE IF NOT EXISTS utilisateurs (
     id INT PRIMARY KEY AUTO_INCREMENT,
     type ENUM('admin', 'employe', 'client') NOT NULL,
     nom VARCHAR(100) NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE utilisateurs (
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table des catégories de dépenses
-CREATE TABLE categories_depenses (
+CREATE TABLE IF NOT EXISTS categories_depenses (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -31,7 +31,7 @@ CREATE TABLE categories_depenses (
 );
 
 -- Table des catégories de produits
-CREATE TABLE categories_produits (
+CREATE TABLE IF NOT EXISTS categories_produits (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -43,7 +43,7 @@ CREATE TABLE categories_produits (
 );
 
 -- Table des produits
-CREATE TABLE produits (
+CREATE TABLE IF NOT EXISTS produits (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -62,7 +62,7 @@ CREATE TABLE produits (
 );
 
 -- Table des fournisseurs
-CREATE TABLE fournisseurs (
+CREATE TABLE IF NOT EXISTS fournisseurs (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     email VARCHAR(100),
@@ -75,7 +75,7 @@ CREATE TABLE fournisseurs (
 );
 
 -- Table des commandes
-CREATE TABLE commandes (
+CREATE TABLE IF NOT EXISTS commandes (
     id INT PRIMARY KEY AUTO_INCREMENT,
     client_id INT NOT NULL,
     employe_id INT NOT NULL,
@@ -89,7 +89,7 @@ CREATE TABLE commandes (
 );
 
 -- Table des détails de commande
-CREATE TABLE details_commande (
+CREATE TABLE IF NOT EXISTS details_commande (
     id INT PRIMARY KEY AUTO_INCREMENT,
     commande_id INT NOT NULL,
     produit_id INT NOT NULL,
@@ -102,7 +102,7 @@ CREATE TABLE details_commande (
 );
 
 -- Table des livraisons
-CREATE TABLE livraisons (
+CREATE TABLE IF NOT EXISTS livraisons (
     id INT PRIMARY KEY AUTO_INCREMENT,
     commande_id INT NOT NULL,
     client_id INT NOT NULL,
@@ -119,7 +119,7 @@ CREATE TABLE livraisons (
 );
 
 -- Table des mouvements de stock
-CREATE TABLE mouvements_stock (
+CREATE TABLE IF NOT EXISTS mouvements_stock (
     id INT PRIMARY KEY AUTO_INCREMENT,
     produit_id INT NOT NULL,
     quantite INT NOT NULL,
@@ -132,7 +132,7 @@ CREATE TABLE mouvements_stock (
 );
 
 -- Table des dépenses
-CREATE TABLE depenses (
+CREATE TABLE IF NOT EXISTS depenses (
     id INT PRIMARY KEY AUTO_INCREMENT,
     type ENUM('approvisionnement', 'maintenance', 'salaires', 'autre') NOT NULL,
     description TEXT NOT NULL,
@@ -148,7 +148,7 @@ CREATE TABLE depenses (
 );
 
 -- Table des promotions
-CREATE TABLE promotions (
+CREATE TABLE IF NOT EXISTS promotions (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -167,7 +167,7 @@ CREATE TABLE promotions (
 );
 
 -- Table des cartes de fidélité
-CREATE TABLE cartes_fidelite (
+CREATE TABLE IF NOT EXISTS cartes_fidelite (
     id INT PRIMARY KEY AUTO_INCREMENT,
     client_id INT NOT NULL,
     points INT NOT NULL DEFAULT 0,
@@ -177,7 +177,7 @@ CREATE TABLE cartes_fidelite (
 );
 
 -- Table des récompenses
-CREATE TABLE recompenses (
+CREATE TABLE IF NOT EXISTS recompenses (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -189,7 +189,7 @@ CREATE TABLE recompenses (
 );
 
 -- Table de l'historique des récompenses
-CREATE TABLE historique_recompenses (
+CREATE TABLE IF NOT EXISTS historique_recompenses (
     id INT PRIMARY KEY AUTO_INCREMENT,
     client_id INT NOT NULL,
     recompense_id INT NOT NULL,
@@ -199,7 +199,7 @@ CREATE TABLE historique_recompenses (
 );
 
 -- Table des avis produits
-CREATE TABLE avis_produits (
+CREATE TABLE IF NOT EXISTS avis_produits (
     id INT PRIMARY KEY AUTO_INCREMENT,
     produit_id INT NOT NULL,
     client_id INT NOT NULL,
@@ -211,7 +211,7 @@ CREATE TABLE avis_produits (
 );
 
 -- Table des offres saisonnières
-CREATE TABLE offres_saisonniere (
+CREATE TABLE IF NOT EXISTS offres_saisonniere (
     id INT PRIMARY KEY AUTO_INCREMENT,
     nom VARCHAR(100) NOT NULL,
     description TEXT,
@@ -223,7 +223,7 @@ CREATE TABLE offres_saisonniere (
 );
 
 -- Table des produits en offre saisonnière
-CREATE TABLE produits_offre_saisonniere (
+CREATE TABLE IF NOT EXISTS produits_offre_saisonniere (
     id INT PRIMARY KEY AUTO_INCREMENT,
     offre_id INT NOT NULL,
     produit_id INT NOT NULL,
@@ -233,7 +233,7 @@ CREATE TABLE produits_offre_saisonniere (
 );
 
 -- Table des paiements
-CREATE TABLE paiements (
+CREATE TABLE IF NOT EXISTS paiements (
     id INT PRIMARY KEY AUTO_INCREMENT,
     commande_id INT NOT NULL,
     montant DECIMAL(10,2) NOT NULL,
@@ -245,21 +245,25 @@ CREATE TABLE paiements (
 );
 
 -- Table des rapports de stock
-CREATE TABLE rapports_stock (
+CREATE TABLE IF NOT EXISTS rapports_stock (
     id INT PRIMARY KEY AUTO_INCREMENT,
     produit_id INT NOT NULL,
+    quantite_initiale INT NOT NULL,
     quantite_actuelle INT NOT NULL,
-    valeur_stock DECIMAL(10,2) NOT NULL,
     date_rapport DATETIME DEFAULT CURRENT_TIMESTAMP,
+    created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     FOREIGN KEY (produit_id) REFERENCES produits(id)
 );
 
 -- Table des alertes de stock
-CREATE TABLE alertes_stock (
+CREATE TABLE IF NOT EXISTS alertes_stock (
     id INT PRIMARY KEY AUTO_INCREMENT,
     produit_id INT NOT NULL,
-    type_alerte ENUM('stock_bas', 'expiration_prochaine', 'rupture_stock') NOT NULL,
-    date_alerte DATETIME DEFAULT CURRENT_TIMESTAMP,
-    statut ENUM('non_vue', 'vu', 'actionnee') DEFAULT 'non_vue',
+    seuil INT NOT NULL,
+    message TEXT NOT NULL,
+    statut ENUM('active', 'resou') DEFAULT 'active',
+    date_creation DATETIME DEFAULT CURRENT_TIMESTAMP,
+    date_resolution DATETIME NULL,
     FOREIGN KEY (produit_id) REFERENCES produits(id)
 );

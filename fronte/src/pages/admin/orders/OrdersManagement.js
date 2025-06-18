@@ -198,7 +198,7 @@ const OrdersManagement = () => {
   // Ouvrir le dialogue de changement de statut
   const handleOpenStatusDialog = (order) => {
     setSelectedOrder(order);
-    setNewStatus(order.status);
+    setNewStatus(order.status || '');
     setStatusNote('');
     setStatusDialogOpen(true);
   };
@@ -238,7 +238,7 @@ const OrdersManagement = () => {
                       {order.phoneNumber}
                     </Typography>
                   </TableCell>
-                  <TableCell>{order.total.toFixed(2)} GNF</TableCell>
+                  <TableCell>{parseFloat(order.total).toFixed(2)} GNF</TableCell>
                   <TableCell>
                     <Chip
                       label={order.status}
@@ -318,11 +318,11 @@ const OrdersManagement = () => {
                       <TableRow key={item.productId}>
                         <TableCell>{item.name}</TableCell>
                         <TableCell align="right">
-                          {item.price.toFixed(2)} GNF
+                          {parseFloat(item.price).toFixed(2)} GNF
                         </TableCell>
                         <TableCell align="right">{item.quantity}</TableCell>
                         <TableCell align="right">
-                          {(item.price * item.quantity).toFixed(2)} GNF
+                          {(parseFloat(item.price) * item.quantity).toFixed(2)} GNF
                         </TableCell>
                       </TableRow>
                     ))}
@@ -332,7 +332,7 @@ const OrdersManagement = () => {
 
               <Box sx={{ mt: 2, textAlign: 'right' }}>
                 <Typography variant="h6">
-                  Total: {selectedOrder.total.toFixed(2)} GNF
+                  Total: {parseFloat(selectedOrder.total).toFixed(2)} GNF
                 </Typography>
               </Box>
             </Box>
@@ -380,7 +380,7 @@ const OrdersManagement = () => {
           <Button onClick={() => setStatusDialogOpen(false)}>Annuler</Button>
           <Button
             variant="contained"
-            onClick={handleStatusChange}
+            onClick={() => handleStatusChange('order')}
             disabled={updateOrderStatusMutation.isLoading}
           >
             {updateOrderStatusMutation.isLoading ? 'En cours...' : 'Confirmer'}

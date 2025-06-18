@@ -82,7 +82,7 @@ const Checkout = () => {
           quantity: item.quantity,
           price: item.price
         })) : [],
-        totalAmount: calculateTotal(),
+        totalAmount: Number(calculateTotal()),
         deliveryAddress: formData.deliveryAddress,
         deliveryZone: formData.deliveryZone,
         paymentMethod: formData.paymentMethod,

@@ -44,7 +44,14 @@ import {
   FormControl,
   InputLabel,
   Alert,
-  CircularProgress
+  CircularProgress,
+  TableContainer,
+  Table,
+  TableHead,
+  TableBody,
+  TableRow,
+  Chip,
+  TableCell
 } from '@mui/material';
 
 // Material-UI Icons
@@ -116,11 +123,14 @@ const Shop = () => {
   const [selectedOrder, setSelectedOrder] = useState(null);
   const [activeTab, setActiveTab] = useState(0);
   const [page, setPage] = useState(0);
+  const [showCancelOrderDialog, setShowCancelOrderDialog] = useState(false);
+  const [orderToCancel, setOrderToCancel] = useState(null);
 
   // États des dialogues
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
+  const [showClientOrdersDialog, setShowClientOrdersDialog] = useState(false);
 
   // Récupération des produits avec React Query
   const { 
@@ -137,6 +147,36 @@ const Shop = () => {
       console.error('Erreur lors de la récupération des produits:', error);
       showNotification('Erreur lors de la récupération des produits', 'error');
     }
+  });
+
+  // Récupération des commandes du client
+  const { 
+    data: clientOrders = [], 
+    isLoading: clientOrdersLoading, 
+    refetch: refetchClientOrders 
+  } = useQuery({
+    queryKey: ['clientOrders'],
+    queryFn: orderService.getOrders,
+    onError: (error) => {
+      console.error('Erreur lors de la récupération des commandes du client:', error);
+      showNotification('Erreur lors du chargement de vos commandes', 'error');
+    },
+    staleTime: 1000 * 60 * 5, // 5 minutes
+  });
+
+  // Mutation pour annuler une commande
+  const cancelOrderMutation = useMutation({
+    mutationFn: (orderId) => orderService.updateOrderStatus(orderId, 'cancelled'),
+    onSuccess: () => {
+      showNotification('Commande annulée avec succès !', 'success');
+      refetchClientOrders(); // Recharger les commandes après annulation
+      setOrderToCancel(null);
+      setShowCancelOrderDialog(false);
+    },
+    onError: (error) => {
+      console.error('Erreur lors de l\'annulation de la commande:', error);
+      showNotification('Erreur lors de l\'annulation de la commande', 'error');
+    },
   });
 
   // Gestion des promotions
@@ -256,14 +296,14 @@ const Shop = () => {
 
   // Fonctions de gestion des commandes
   const calculateTotalAmount = () => {
-    if (!Array.isArray(cart)) return deliveryFee;
+    if (!Array.isArray(cart)) return 0; // Return 0 if cart is not an array
     
     const cartTotal = cart.reduce((sum, item) => {
       const price = item?.price || item?.prix || 0;
       const quantity = item?.quantity || 1;
       return sum + (price * quantity);
     }, 0);
-    return cartTotal + deliveryFee;
+    return cartTotal; // Only return cart total, delivery fee will be added at order creation
   };
 
   const createOrderMutation = useMutation({
@@ -272,7 +312,7 @@ const Shop = () => {
       queryClient.invalidateQueries(['orders']);
       showNotification('Commande créée avec succès', 'success');
     },
-    onError: () => {
+    onError: (error) => {
       showNotification('Erreur lors de la création de la commande', 'error');
     }
   });
@@ -292,7 +332,7 @@ const Shop = () => {
         })),
         deliveryAddress,
         deliveryFee,
-        totalAmount: calculateTotalAmount(),
+        totalAmount: calculateTotalAmount() + deliveryFee, // Ensure delivery fee is added here
         paymentMethod,
         status: 'pending',
         note: orderNote
@@ -458,7 +498,7 @@ const Shop = () => {
         deliveryDistance,
         deliveryFee,
         paymentMethod,
-        total: orderTotal,
+        totalAmount: orderTotal,
         status: 'pending',
         items: orderItems,
         deliveryQuarter: selectedQuarter,
@@ -547,6 +587,16 @@ const Shop = () => {
         </FormControl>
       </Box>
 
+      <Button
+        variant="outlined"
+        color="info"
+        startIcon={<NotificationsIcon />}
+        onClick={() => setShowClientOrdersDialog(true)}
+        sx={{ mb: 3 }}
+      >
+        Mes Commandes
+      </Button>
+
       {/* Liste des produits */}
       {isLoading ? (
         <Box sx={{ display: 'flex', justifyContent: 'center', mt: 4 }}>
@@ -565,7 +615,12 @@ const Shop = () => {
               <Card>
                 <CardMedia
                   component="img"
-                  height="140"
+                  sx={{
+                    height: 180,
+                    width: '100%',
+                    objectFit: 'contain',
+                    display: 'block'
+                  }}
                   image={
                     product?.image_url 
                       ? product.image_url.startsWith('http') 
@@ -764,23 +819,110 @@ const Shop = () => {
 
       {/* Dialog de confirmation de commande */}
       <Dialog open={showOrderDialog} onClose={() => setShowOrderDialog(false)}>
-        <DialogTitle>Commande confirmée</DialogTitle>
+        <DialogTitle>Commande Passée !</DialogTitle>
         <DialogContent>
-          <Typography sx={{ mt: 2 }}>
-            Votre commande a été confirmée avec succès !
-          </Typography>
-          <Typography>
-            Sous-total: {formatPrice(totalCartAmount)}
-          </Typography>
-          <Typography>
-            Frais de livraison: {formatPrice(deliveryFee)}
-          </Typography>
-          <Typography variant="h6" color="primary">
-            Total: {formatPrice(totalCartAmount + deliveryFee)}
+          <Typography variant="body1">
+            Votre commande a été passée avec succès. Nous vous notifierons de son statut.
           </Typography>
         </DialogContent>
         <DialogActions>
+          <Button onClick={() => {
+            setShowOrderDialog(false);
+            navigate('/mes-commandes'); // Correction de la route de navigation
+          }} variant="contained">Voir mes commandes</Button>
           <Button onClick={() => setShowOrderDialog(false)}>Fermer</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog de confirmation d'annulation de commande */}
+      <Dialog
+        open={showCancelOrderDialog}
+        onClose={() => setShowCancelOrderDialog(false)}
+        aria-labelledby="alert-dialog-title"
+        aria-describedby="alert-dialog-description"
+      >
+        <DialogTitle id="alert-dialog-title">{"Annuler la commande ?"}</DialogTitle>
+        <DialogContent>
+          <Typography id="alert-dialog-description">
+            Êtes-vous sûr de vouloir annuler la commande #{orderToCancel?.id} ? Cette action est irréversible.
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowCancelOrderDialog(false)}>Non</Button>
+          <Button onClick={() => {
+            if (orderToCancel) {
+              cancelOrderMutation.mutate(orderToCancel.id);
+            }
+          }} autoFocus>Oui, Annuler</Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Dialog des commandes du client */}
+      <Dialog
+        open={showClientOrdersDialog}
+        onClose={() => setShowClientOrdersDialog(false)}
+        maxWidth="md"
+        fullWidth
+      >
+        <DialogTitle>Mes Commandes</DialogTitle>
+        <DialogContent dividers>
+          {clientOrdersLoading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+              <CircularProgress />
+            </Box>
+          ) : Array.isArray(clientOrders) && clientOrders.length > 0 ? (
+            <TableContainer component={Paper}>
+              <Table>
+                <TableHead>
+                  <TableRow>
+                    <TableCell>N° Commande</TableCell>
+                    <TableCell>Date</TableCell>
+                    <TableCell align="right">Total</TableCell>
+                    <TableCell>Statut</TableCell>
+                    <TableCell align="center">Action</TableCell>
+                  </TableRow>
+                </TableHead>
+                <TableBody>
+                  {clientOrders.map((order) => (
+                    <TableRow key={order.id}>
+                      <TableCell>{order.id}</TableCell>
+                      <TableCell>{new Date(order.date).toLocaleDateString()}</TableCell>
+                      <TableCell align="right">{formatPrice(order.total)}</TableCell>
+                      <TableCell>
+                        <Chip
+                          label={order.status}
+                          color={order.status === 'pending' ? 'warning' : order.status === 'cancelled' ? 'error' : 'success'}
+                          size="small"
+                        />
+                      </TableCell>
+                      <TableCell align="center">
+                        {order.status === 'pending' && (
+                          <Button
+                            variant="outlined"
+                            color="error"
+                            size="small"
+                            onClick={() => {
+                              setOrderToCancel(order);
+                              setShowCancelOrderDialog(true);
+                            }}
+                          >
+                            Annuler
+                          </Button>
+                        )}
+                      </TableCell>
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            </TableContainer>
+          ) : (
+            <Typography variant="body1" align="center" sx={{ py: 4 }}>
+              Vous n'avez pas encore de commandes.
+            </Typography>
+          )}
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={() => setShowClientOrdersDialog(false)}>Fermer</Button>
         </DialogActions>
       </Dialog>
 
