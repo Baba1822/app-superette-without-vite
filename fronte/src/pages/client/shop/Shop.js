@@ -7,6 +7,7 @@ import { productService } from '../../../services/productService';
 import { orderService } from '../../../services/orderService';
 import { loyaltyService } from '../../../services/loyaltyService';
 import { DeliveryService } from '../../../services/DeliveryService';
+import { useAuth } from '../../../context/AuthContext';
 import 'slick-carousel/slick/slick.css';
 import 'slick-carousel/slick/slick-theme.css';
 
@@ -99,6 +100,7 @@ const Shop = () => {
   const queryClient = useQueryClient();
   const productContext = useProductContext() || {};
   const { newProductAdded, stockUpdated, clearNewProduct, clearStockUpdate } = productContext;
+  const { user } = useAuth();
 
   // États du composant
   const [cartOpen, setCartOpen] = useState(false);
@@ -125,12 +127,20 @@ const Shop = () => {
   const [page, setPage] = useState(0);
   const [showCancelOrderDialog, setShowCancelOrderDialog] = useState(false);
   const [orderToCancel, setOrderToCancel] = useState(null);
+  const [creatingOrder, setCreatingOrder] = useState(false);
+  const [deliveryName, setDeliveryName] = useState('');
+  const [deliveryPhoneNumber, setDeliveryPhoneNumber] = useState('');
 
   // États des dialogues
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [showClientOrdersDialog, setShowClientOrdersDialog] = useState(false);
+
+  // Fonction utilitaire pour le formatage des prix
+  const formatPrice = (amount) => {
+    return `${amount?.toLocaleString()} GNF`;
+  };
 
   // Récupération des produits avec React Query
   const { 
@@ -310,6 +320,7 @@ const Shop = () => {
     mutationFn: (orderData) => orderService.createOrder(orderData),
     onSuccess: () => {
       queryClient.invalidateQueries(['orders']);
+      queryClient.invalidateQueries(['products']);
       showNotification('Commande créée avec succès', 'success');
     },
     onError: (error) => {
@@ -318,37 +329,75 @@ const Shop = () => {
   });
 
   const createOrder = async () => {
-    try {
-      if (!Array.isArray(cart) || cart.length === 0) {
-        showNotification('Le panier est vide', 'error');
-        return null;
-      }
+    if (!user || !user.id) {
+      showNotification('Veuillez vous connecter pour passer une commande.', 'error');
+      return;
+    }
 
+    if (cart.length === 0) {
+      showNotification('Votre panier est vide.', 'warning');
+      return;
+    }
+
+    if (paymentMethod === 'delivery' && !selectedQuarter) {
+      showNotification('Veuillez sélectionner un quartier pour la livraison.', 'warning');
+      return;
+    }
+
+    setCreatingOrder(true);
+    try {
       const orderData = {
-        items: cart.map(item => ({
-          productId: item?.id || 0,
-          quantity: item?.quantity || 1,
-          price: item?.price || item?.prix || 0
+        clientId: user.id,
+        products: cart.map(item => ({
+          productId: item.id,
+          quantity: item.quantity,
+          price: item.price,
         })),
-        deliveryAddress,
-        deliveryFee,
-        totalAmount: calculateTotalAmount() + deliveryFee, // Ensure delivery fee is added here
-        paymentMethod,
+        totalAmount: orderTotal,
+        paymentMethod: paymentMethod,
         status: 'pending',
-        note: orderNote
+        deliveryAddress: deliveryAddress,
+        deliveryFee: deliveryFee,
+        note: orderNote,
+        deliveryQuarter: selectedQuarter,
+        phoneNumber: user.phone || '',
+        deliveryName,
+        deliveryPhoneNumber,
       };
 
-      const order = await orderService.createOrder(orderData);
-      showNotification('Commande créée avec succès ! Attendez la confirmation de l\'admin.', 'info');
-      setShowOrderDialog(false);
-      
-      if (clearCartAction) {
-        clearCartAction();
+      if (paymentMethod === 'delivery') {
+        orderData.deliveryName = deliveryName;
+        orderData.deliveryPhoneNumber = deliveryPhoneNumber;
       }
-      return order;
+
+      const newOrder = await orderService.createOrder(orderData);
+      queryClient.invalidateQueries(['orders', 'clientOrders']);
+      showNotification('Commande passée avec succès !', 'success');
+
+      refetchClientOrders().then(async ({ data: updatedOrders }) => {
+        const totalOrders = updatedOrders.length;
+        if (totalOrders >= 30) {
+          try {
+            const existingCard = await loyaltyService.getLoyaltyCard(user.id);
+            if (!existingCard || Object.keys(existingCard).length === 0) {
+              await loyaltyService.createLoyaltyCard(user.id);
+              showNotification('Félicitations ! Votre carte de fidélité a été créée.', 'success');
+            }
+          } catch (loyaltyError) {
+            console.error('Erreur lors de la gestion de la carte de fidélité:', loyaltyError);
+            showNotification('Erreur lors de la création de la carte de fidélité.', 'error');
+          }
+        }
+      });
+
+      clearCartAction();
+      handleCloseOrderDialog();
+      navigate('/client/orders');
     } catch (error) {
-      showNotification('Erreur lors de la création de la commande', 'error');
-      return null;
+      console.error('Erreur lors de la création de la commande:', error);
+      showNotification(error.message || 'Erreur lors de la création de la commande', 'error');
+    } finally {
+      setCreatingOrder(false);
     }
   };
 
@@ -397,14 +446,6 @@ const Shop = () => {
       showNotification('Erreur lors du paiement', 'error');
       return false;
     }
-  };
-
-  // Fonction utilitaire
-  const formatPrice = (amount) => {
-    return new Intl.NumberFormat('fr-FR', {
-      style: 'currency',
-      currency: 'GNF'
-    }).format(amount || 0);
   };
 
   // Gestion des produits filtrés avec vérification de données
@@ -502,7 +543,9 @@ const Shop = () => {
         status: 'pending',
         items: orderItems,
         deliveryQuarter: selectedQuarter,
-        phoneNumber: localStorage.getItem('userPhone')
+        phoneNumber: localStorage.getItem('userPhone'),
+        deliveryName,
+        deliveryPhoneNumber,
       };
 
       createOrderMutation.mutate(orderData);
@@ -546,6 +589,10 @@ const Shop = () => {
       clearStockUpdate();
     }
   }, [stockUpdated, clearStockUpdate, cart]);
+
+  const handleCloseOrderDialog = () => {
+    setShowOrderDialog(false);
+  };
 
   return (
     <Box sx={{ flexGrow: 1, p: 3 }}>
@@ -730,42 +777,66 @@ const Shop = () => {
         <DialogTitle>Informations de livraison</DialogTitle>
         <DialogContent>
           <Box sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Adresse de livraison"
-              value={deliveryAddress}
-              onChange={(e) => setDeliveryAddress(e.target.value)}
-              margin="normal"
-              required
-            />
-            <FormControl fullWidth margin="normal" required>
-              <InputLabel>Quartier</InputLabel>
-              <Select
-                value={selectedQuarter}
-                onChange={(e) => setSelectedQuarter(e.target.value)}
-                label="Quartier"
-              >
-                {Object.keys(CONAKRY_QUARTERS).map((quarter) => (
-                  <MenuItem key={quarter} value={quarter}>
-                    {quarter}
-                  </MenuItem>
-                ))}
-              </Select>
-            </FormControl>
-            <TextField
-              fullWidth
-              label="Distance (km)"
-              type="number"
-              value={deliveryDistance}
-              onChange={(e) => setDeliveryDistance(Number(e.target.value) || 0)}
-              margin="normal"
-              inputProps={{ min: 0, step: 0.1 }}
-            />
-            {selectedQuarter && (
-              <Typography color="primary" sx={{ mt: 2 }}>
-                Frais de livraison: {formatPrice(calculateDeliveryFee(selectedQuarter, deliveryDistance))}
-              </Typography>
-            )}
+            <Grid container spacing={2}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Adresse de livraison"
+                  value={deliveryAddress}
+                  onChange={(e) => setDeliveryAddress(e.target.value)}
+                  margin="normal"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Quartier"
+                  value={selectedQuarter}
+                  onChange={(e) => setSelectedQuarter(e.target.value)}
+                  margin="normal"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Distance (km)"
+                  type="number"
+                  value={deliveryDistance}
+                  onChange={(e) => setDeliveryDistance(Number(e.target.value) || 0)}
+                  margin="normal"
+                  inputProps={{ min: 0, step: 0.1 }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Nom"
+                  value={deliveryName}
+                  onChange={(e) => setDeliveryName(e.target.value)}
+                  margin="normal"
+                  required
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Téléphone"
+                  value={deliveryPhoneNumber}
+                  onChange={(e) => setDeliveryPhoneNumber(e.target.value)}
+                  margin="normal"
+                  required
+                />
+              </Grid>
+              {selectedQuarter && (
+                <Grid item xs={12}>
+                  <Typography color="primary" sx={{ mt: 2 }}>
+                    Frais de livraison: {formatPrice(calculateDeliveryFee(selectedQuarter, deliveryDistance))}
+                  </Typography>
+                </Grid>
+              )}
+            </Grid>
           </Box>
         </DialogContent>
         <DialogActions>

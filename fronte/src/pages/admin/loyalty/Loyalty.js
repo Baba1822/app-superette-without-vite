@@ -42,9 +42,30 @@ import { format } from 'date-fns';
 import { useEffect, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Cell, Legend, Line, LineChart, Pie, PieChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { loyaltyService } from '../../../services/loyaltyService';
+import { useAuth } from '../../../context/AuthContext';
+
 const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
 
+const LOYALTY_TIERS = [
+    {
+        name: 'Bronze',
+        minPoints: 0,
+        benefits: ['1 point par 100 GNF dépensés', 'Offres spéciales occasionnelles']
+    },
+    {
+        name: 'Silver',
+        minPoints: 500,
+        benefits: ['1.5 points par 100 GNF dépensés', 'Offres exclusives']
+    },
+    {
+        name: 'Gold',
+        minPoints: 1000,
+        benefits: ['2 points par 100 GNF dépensés', 'Offres VIP']
+    }
+];
+
 const Loyalty = () => {
+    const { user } = useAuth();
     const [activeTab, setActiveTab] = useState(0);
     const [cards, setCards] = useState([]);
     const [loyaltyTiers, setLoyaltyTiers] = useState([]);
@@ -77,45 +98,60 @@ const Loyalty = () => {
     useEffect(() => {
         const loadData = async () => {
             try {
+                if (!user || !user.id) {
+                    setSnackbar({
+                        open: true,
+                        message: 'ID client non disponible. Veuillez vous connecter.',
+                        severity: 'warning',
+                    });
+                    setLoading(prev => ({ ...prev, cards: false, tiers: false, rewards: false, history: false, analytics: false }));
+                    return; // Arrêter si l'ID client n'est pas disponible
+                }
+
+                const clientId = user.id;
+
                 // Charger les cartes de fidélité
-                const clientId = 1; // À remplacer par l'ID réel du client ou une gestion d'authentification
-                const cardData = await loyaltyService.getLoyaltyCard(clientId);
+                let cardData = await loyaltyService.getLoyaltyCard(clientId);
+
+                if (!cardData || Object.keys(cardData).length === 0) {
+                    // If no card found, create one
+                    try {
+                        cardData = await loyaltyService.createLoyaltyCard(clientId);
+                        setSnackbar({
+                            open: true,
+                            message: 'Nouvelle carte de fidélité créée.',
+                            severity: 'info',
+                        });
+                    } catch (createError) {
+                        console.error('Erreur lors de la création de la carte de fidélité:', createError);
+                        setSnackbar({
+                            open: true,
+                            message: `Erreur lors de la création de la carte: ${createError.message}`,
+                            severity: 'error',
+                        });
+                        setLoading(prev => ({ ...prev, cards: false }));
+                        return; // Stop loading other data if card creation fails
+                    }
+                }
+
                 setCards([{
-                    id: clientId,
-                    customerId: clientId,
-                    customerName: `Client ${clientId}`,
+                    id: cardData.id,
+                    customerId: cardData.clientId,
+                    customerName: `Client ${cardData.clientId}`,
                     cardNumber: cardData.cardNumber,
                     points: cardData.points,
                     tier: cardData.tier,
                     joinDate: cardData.joinDate,
-                    lastPurchase: new Date().toISOString().split('T')[0],
                     totalSpent: cardData.totalSpent
                 }]);
                 setLoading(prev => ({ ...prev, cards: false }));
 
                 // Charger les niveaux de fidélité
-                const tierInfo = await loyaltyService.checkLoyaltyTier(clientId);
-                setLoyaltyTiers([
-                    {
-                        name: 'Bronze',
-                        minPoints: 0,
-                        benefits: ['1 point par 100 GNF dépensés', 'Offres spéciales occasionnelles']
-                    },
-                    {
-                        name: 'Silver',
-                        minPoints: 500,
-                        benefits: ['1.5 points par 100 GNF dépensés', 'Offres exclusives']
-                    },
-                    {
-                        name: 'Gold',
-                        minPoints: 1000,
-                        benefits: ['2 points par 100 GNF dépensés', 'Offres VIP']
-                    }
-                ]);
+                setLoyaltyTiers(LOYALTY_TIERS);
                 setLoading(prev => ({ ...prev, tiers: false }));
 
                 // Charger les récompenses disponibles
-                const rewards = await loyaltyService.getAvailableRewards(clientId);
+                const rewards = await loyaltyService.getAvailableRewards();
                 setAvailableRewards(rewards);
                 setLoading(prev => ({ ...prev, rewards: false }));
 
@@ -127,7 +163,7 @@ const Loyalty = () => {
                     date: item.date,
                     points: item.type === 'earn' ? item.points : -item.points,
                     type: item.type === 'earn' ? 'purchase' : 'redemption',
-                    description: item.transaction || `Échange pour ${item.rewardName || 'récompense'}`
+                    description: item.transaction || `Échange pour ${item.rewardName || ''}`
                 })));
                 setLoading(prev => ({ ...prev, history: false }));
 
@@ -156,11 +192,11 @@ const Loyalty = () => {
         };
 
         loadData();
-    }, []);
+    }, [user]);
 
     // Fonction pour calculer le niveau basé sur les points
     const calculateTier = (points) => {
-        return loyaltyTiers
+        return LOYALTY_TIERS
             .filter(tier => points >= tier.minPoints)
             .sort((a, b) => b.minPoints - a.minPoints)[0]?.name || 'Bronze';
     };
@@ -297,7 +333,6 @@ const Loyalty = () => {
                             cardNumber: '',
                             points: 0,
                             joinDate: format(new Date(), 'yyyy-MM-dd'),
-                            lastPurchase: format(new Date(), 'yyyy-MM-dd'),
                             totalSpent: 0
                         });
                         setShowCardDialog(true);
@@ -707,18 +742,6 @@ const Loyalty = () => {
                                 type="date"
                                 value={selectedCard?.joinDate || format(new Date(), 'yyyy-MM-dd')}
                                 onChange={(e) => setSelectedCard({ ...selectedCard, joinDate: e.target.value })}
-                                InputLabelProps={{
-                                    shrink: true,
-                                }}
-                            />
-                        </Grid>
-                        <Grid item xs={12} sm={6}>
-                            <TextField
-                                fullWidth
-                                label="Dernier achat"
-                                type="date"
-                                value={selectedCard?.lastPurchase || format(new Date(), 'yyyy-MM-dd')}
-                                onChange={(e) => setSelectedCard({ ...selectedCard, lastPurchase: e.target.value })}
                                 InputLabelProps={{
                                     shrink: true,
                                 }}

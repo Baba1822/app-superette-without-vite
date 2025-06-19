@@ -1,6 +1,61 @@
 const pool = require('../config/db');
 
 class SalesManagement {
+    static async getAll() {
+        try {
+            const [sales] = await pool.query('SELECT * FROM sales');
+            return sales.map(sale => ({
+                id: sale.id,
+                date: sale.date,
+                clientId: sale.client_id,
+                clientName: sale.client_name,
+                totalAmount: parseFloat(sale.total_amount) || 0,
+                paymentMethod: sale.payment_method,
+                status: sale.status,
+                notes: sale.notes,
+                customerAddress: sale.customer_address,
+                customerPhone: sale.customer_phone,
+                createdAt: sale.created_at,
+                updatedAt: sale.updated_at,
+                products: JSON.parse(sale.products_json || '[]')
+            }));
+        } catch (error) {
+            console.error('Erreur lors de la récupération de toutes les ventes:', error);
+            throw error;
+        }
+    }
+
+    static async create(saleData) {
+        try {
+            // Sécuriser la date : utiliser la date actuelle si absente ou invalide
+            let date;
+            if (saleData.date) {
+                const d = new Date(saleData.date);
+                date = (d instanceof Date && !isNaN(d)) ? d.toISOString().slice(0, 19).replace('T', ' ') : new Date().toISOString().slice(0, 19).replace('T', ' ');
+            } else {
+                date = new Date().toISOString().slice(0, 19).replace('T', ' ');
+            }
+
+            // Gérer client_id : NULL si 'N/A' ou invalide
+            let clientId = null;
+            if (saleData.clientId && saleData.clientId !== 'N/A' && !isNaN(saleData.clientId)) {
+                clientId = parseInt(saleData.clientId);
+            }
+
+            const { clientName, products, totalAmount, paymentMethod, status, notes, customerAddress, customerPhone } = saleData;
+            const productsJson = JSON.stringify(products);
+            
+            const [result] = await pool.query(
+                'INSERT INTO sales (date, client_id, client_name, products_json, total_amount, payment_method, status, notes, customer_address, customer_phone) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [date, clientId, clientName, productsJson, totalAmount, paymentMethod, status, notes, customerAddress, customerPhone]
+            );
+            return { id: result.insertId, ...saleData, date, client_id: clientId };
+        } catch (error) {
+            console.error('Erreur lors de la création de la vente:', error);
+            throw error;
+        }
+    }
+
     static async getSalesReport(filters = {}) {
         let query = `SELECT c.*, cl.nom as client_nom, cl.email as client_email,
             cl.telephone as client_telephone, e.nom as employe_nom,

@@ -31,6 +31,7 @@ import {
 } from '@mui/icons-material';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { orderService } from '../../../services/orderService';
+import SalesService from '../../../services/SalesService';
 import { toast } from 'react-toastify';
 
 const ITEMS_PER_PAGE = 10;
@@ -51,16 +52,47 @@ const OrdersManagement = () => {
   // Charger les commandes
   const { data: orders = [], isLoading } = useQuery({
     queryKey: ['orders'],
-    queryFn: orderService.getAllOrders
+    queryFn: orderService.getAllOrders,
+    onError: (error) => {
+      console.error('Erreur lors du chargement des commandes:', error);
+      return [];
+    }
   });
 
   // Mutations pour mettre à jour les statuts
   const updateOrderStatusMutation = useMutation({
     mutationFn: ({ orderId, status }) => orderService.updateOrderStatus(orderId, status),
-    onSuccess: () => {
+    onSuccess: async (_, variables) => {
       queryClient.invalidateQueries(['orders']);
       setStatusDialogOpen(false);
       toast.success('Statut de la commande mis à jour avec succès');
+
+      // Si le statut est 'delivered', créer une entrée de vente
+      if (variables.status.status === 'delivered' && selectedOrder) {
+        try {
+          const saleData = {
+            date: new Date(selectedOrder.createdAt),
+            clientId: selectedOrder.clientId || 'N/A', // Assurez-vous que clientId est disponible dans l'objet de commande
+            clientName: selectedOrder.clientName || selectedOrder.deliveryAddress || 'N/A',
+            products: selectedOrder.items.map(item => ({
+              name: item.name,
+              quantity: item.quantity,
+              price: item.price,
+            })),
+            totalAmount: parseFloat(selectedOrder.total),
+            paymentMethod: selectedOrder.paymentMethod || 'N/A', // Assurez-vous que paymentMethod est disponible
+            status: variables.status.status, // 'delivered'
+            notes: variables.status.note || '',
+            customerAddress: selectedOrder.deliveryAddress || 'N/A',
+            customerPhone: selectedOrder.phoneNumber || 'N/A',
+          };
+          await SalesService.createSale(saleData);
+          toast.success('Vente ajoutée à la gestion des ventes');
+        } catch (error) {
+          console.error('Erreur lors de l\'ajout de la vente:', error);
+          toast.error('Erreur lors de l\'ajout de la vente à la gestion des ventes');
+        }
+      }
     },
     onError: () => {
       toast.error('Erreur lors de la mise à jour du statut de la commande');
@@ -314,8 +346,8 @@ const OrdersManagement = () => {
                     </TableRow>
                   </TableHead>
                   <TableBody>
-                    {selectedOrder.items.map((item) => (
-                      <TableRow key={item.productId}>
+                    {selectedOrder.items.map((item, index) => (
+                      <TableRow key={`${item.productId}-${index}`}>
                         <TableCell>{item.name}</TableCell>
                         <TableCell align="right">
                           {parseFloat(item.price).toFixed(2)} GNF

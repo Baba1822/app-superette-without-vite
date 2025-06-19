@@ -44,11 +44,20 @@ export const AuthProvider = ({ children }) => {
   // Fonction pour vérifier la validité du token
   const isTokenValid = () => {
     const token = localStorage.getItem('token');
-    if (!token) return false;
+    console.log('isTokenValid: Vérification du token...', { tokenExists: !!token });
+    if (!token) {
+      console.log('isTokenValid: Aucun token trouvé.');
+      return false;
+    }
     try {
       const decoded = jwtDecode(token);
-      return decoded.exp > Date.now() / 1000;
+      const currentTime = Date.now() / 1000;
+      const isValid = decoded.exp > currentTime;
+      console.log('isTokenValid: Token décodé:', decoded);
+      console.log(`isTokenValid: Expire à ${new Date(decoded.exp * 1000).toLocaleString()}, Actuel: ${new Date(currentTime * 1000).toLocaleString()}, Valide: ${isValid}`);
+      return isValid;
     } catch (error) {
+      console.error('isTokenValid: Erreur de décodage du token:', error);
       return false;
     }
   };
@@ -56,22 +65,24 @@ export const AuthProvider = ({ children }) => {
   // Vérification initiale du token
   useEffect(() => {
     const checkAuth = async () => {
+      setLoading(true); // Toujours mettre loading à true au début
       try {
         const token = localStorage.getItem('token');
+        console.log('checkAuth: Début de la vérification, token trouvé:', !!token);
         if (!token) {
           setLoading(false);
+          console.log('checkAuth: Pas de token, fin du chargement.');
           return;
         }
 
         // Vérifier si le token est valide
         if (!isTokenValid()) {
-          console.log('Token expiré, tentative de rafraîchissement...');
+          console.log('checkAuth: Token non valide ou expiré, tentative de rafraîchissement...');
           try {
-            // Ici, vous pouvez implémenter la logique de rafraîchissement du token
-            // Si vous avez une route de rafraîchissement sur votre backend
             const refreshToken = localStorage.getItem('refreshToken');
+            console.log('checkAuth: Refresh token trouvé:', !!refreshToken);
             if (refreshToken) {
-              const response = await fetch(`${API_BASE_URL}/api/auth/refresh-token`, {
+              const response = await fetch(`${API_BASE_URL}/api/auth/refresh`, {
                 method: 'POST',
                 headers: {
                   'Content-Type': 'application/json',
@@ -82,6 +93,9 @@ export const AuthProvider = ({ children }) => {
               if (response.ok) {
                 const data = await response.json();
                 localStorage.setItem('token', data.token);
+                if (data.refreshToken) { // Assurez-vous de stocker le nouveau refresh token si le backend le renvoie
+                  localStorage.setItem('refreshToken', data.refreshToken);
+                }
                 const decoded = jwtDecode(data.token);
                 setUser({
                   id: decoded.id,
@@ -90,16 +104,17 @@ export const AuthProvider = ({ children }) => {
                   nom: decoded.nom,
                   type: decoded.type || decoded.role
                 });
+                console.log('checkAuth: Token et refresh token rafraîchis avec succès.');
               } else {
-                console.error('Échec du rafraîchissement du token');
+                console.error('checkAuth: Échec du rafraîchissement du token.');
                 logout();
               }
             } else {
-              console.log('Pas de refresh token, déconnexion...');
+              console.log('checkAuth: Pas de refresh token, déconnexion...');
               logout();
             }
           } catch (error) {
-            console.error('Erreur lors du rafraîchissement du token:', error);
+            console.error('checkAuth: Erreur lors du rafraîchissement du token:', error);
             logout();
           }
           return;
@@ -114,11 +129,13 @@ export const AuthProvider = ({ children }) => {
           nom: decoded.nom,
           type: decoded.type || decoded.role
         });
+        console.log('checkAuth: Token valide, utilisateur défini.');
       } catch (error) {
-        console.error('Erreur de décodage du token:', error);
+        console.error('checkAuth: Erreur de décodage du token dans useEffect:', error);
         logout();
       } finally {
         setLoading(false);
+        console.log('checkAuth: Fin du chargement.');
       }
     };
 
@@ -221,9 +238,13 @@ export const AuthProvider = ({ children }) => {
 
         // Connexion réussie
         localStorage.setItem('token', response.token);
+        if (response.refreshToken) { // Assurez-vous de stocker le refresh token ici aussi
+          localStorage.setItem('refreshToken', response.refreshToken);
+        }
         setUser(response.user);
         setError('');
         toast.success('Connexion réussie !');
+        console.log('Login: Token stocké et utilisateur défini.');
         return {
           success: true,
           token: response.token,

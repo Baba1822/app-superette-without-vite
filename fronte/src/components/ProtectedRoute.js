@@ -14,6 +14,8 @@ const ProtectedRoute = ({
   const { isAuthenticated, user, loading } = useAuth();
   const location = useLocation();
 
+  console.log('ProtectedRoute: Statut d\'auth:', { isAuthenticated, user, loading, roles });
+
   // Gestion du chargement
   if (loading) {
     return (
@@ -48,6 +50,7 @@ const ProtectedRoute = ({
 
   // Gestion des rôles - redirection immédiate si non autorisé
   if (roles.length > 0 && user?.type && !roles.includes(user.type)) {
+    console.log(`ProtectedRoute: Redirection - Rôle non autorisé. User type: ${user.type}, Rôles requis: ${roles.join(', ')}`);
     const finalRedirect = redirectUnauthorized || getRedirectPath(user.type);
     return (
       <Navigate 

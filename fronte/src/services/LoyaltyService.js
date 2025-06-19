@@ -21,7 +21,7 @@ axiosInstance.interceptors.request.use((config) => {
 export const loyaltyService = {
   getLoyaltyCard: async (customerId) => {
     try {
-      const response = await axiosInstance.get(`/${customerId}`);
+      const response = await axiosInstance.get(`/cards/${customerId}`);
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la récupération de la carte de fidélité:', error);
@@ -31,7 +31,7 @@ export const loyaltyService = {
 
   createLoyaltyCard: async (customerId) => {
     try {
-      const response = await axiosInstance.post('/', { customerId });
+      const response = await axiosInstance.post('/cards', { customerId });
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la création de la carte de fidélité:', error);
@@ -39,9 +39,9 @@ export const loyaltyService = {
     }
   },
 
-  redeemPoints: async (cardId, points) => {
+  redeemPoints: async (clientId, points) => {
     try {
-      const response = await axiosInstance.post(`/${cardId}/redeem`, { points });
+      const response = await axiosInstance.post(`/cards/${clientId}/redeem`, { points });
       return response.data;
     } catch (error) {
       console.error('Erreur lors de la réduction des points:', error);
@@ -49,12 +49,72 @@ export const loyaltyService = {
     }
   },
 
-  addPoints: async (cardId, points) => {
+  addPoints: async (clientId, points) => {
     try {
-      const response = await axiosInstance.post(`/${cardId}/add`, { points });
+      const response = await axiosInstance.post(`/cards/${clientId}/points`, { points });
       return response.data;
     } catch (error) {
       console.error('Erreur lors de l\'ajout des points:', error);
+      throw error;
+    }
+  },
+
+  checkLoyaltyTier: async (clientId) => {
+    try {
+      const response = await axiosInstance.get(`/cards/${clientId}/tier`);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération du niveau de fidélité:', error);
+      throw error;
+    }
+  },
+
+  getAvailableRewards: async () => {
+    try {
+      const response = await axiosInstance.get('/rewards');
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des récompenses disponibles:', error);
+      throw error;
+    }
+  },
+
+  getPointsHistory: async (clientId) => {
+    try {
+      const response = await axiosInstance.get(`/cards/${clientId}/history`);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération de l\'historique des points:', error);
+      throw error;
+    }
+  },
+
+  getLoyaltyStats: async () => {
+    try {
+      const response = await axiosInstance.get('/stats');
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des statistiques de fidélité:', error);
+      throw error;
+    }
+  },
+
+  updateLoyaltyCard: async (cardId, cardData) => {
+    try {
+      const response = await axiosInstance.put(`/cards/${cardId}`, cardData);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour de la carte de fidélité:', error);
+      throw error;
+    }
+  },
+
+  deleteLoyaltyCard: async (cardId) => {
+    try {
+      const response = await axiosInstance.delete(`/cards/${cardId}`);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la suppression de la carte de fidélité:', error);
       throw error;
     }
   },

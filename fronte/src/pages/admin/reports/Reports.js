@@ -34,153 +34,6 @@ import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
 
-// Mock data for demonstration
-const salesData = [
-    { date: '2024-01', amount: 2500000 },
-    { date: '2024-02', amount: 2800000 },
-    { date: '2024-03', amount: 3200000 },
-    { date: '2024-04', amount: 3000000 },
-    { date: '2024-05', amount: 3500000 },
-    { date: '2024-06', amount: 3800000 },
-];
-
-const categoryData = [
-    { name: 'Alimentation', value: 40 },
-    { name: 'Boissons', value: 25 },
-    { name: 'Hygiène', value: 15 },
-    { name: 'Divers', value: 20 },
-];
-
-const COLORS = ['#0088FE', '#00C49F', '#FFBB28', '#FF8042'];
-
-const dailySales = [
-    { day: 'Lundi', amount: 450000 },
-    { day: 'Mardi', amount: 520000 },
-    { day: 'Mercredi', amount: 480000 },
-    { day: 'Jeudi', amount: 550000 },
-    { day: 'Vendredi', amount: 600000 },
-    { day: 'Samedi', amount: 700000 },
-    { day: 'Dimanche', amount: 400000 },
-];
-
-// Mock data for profit margins
-const profitData = [
-    { date: '2024-01', revenue: 2500000, cost: 1750000, profit: 750000 },
-    { date: '2024-02', revenue: 2800000, cost: 1960000, profit: 840000 },
-    { date: '2024-03', revenue: 3200000, cost: 2240000, profit: 960000 },
-    { date: '2024-04', revenue: 3000000, cost: 2100000, profit: 900000 },
-    { date: '2024-05', revenue: 3500000, cost: 2450000, profit: 1050000 },
-    { date: '2024-06', revenue: 3800000, cost: 2660000, profit: 1140000 },
-];
-
-// Mock data for seasonal analysis
-const seasonalData = [
-    { year: '2023', Q1: 7500000, Q2: 8500000, Q3: 9000000, Q4: 11000000 },
-    { year: '2024', Q1: 8500000, Q2: 9500000, Q3: null, Q4: null },
-];
-
-// Mock data for sales forecast
-const forecastData = [
-    { date: '2024-07', actual: null, forecast: 4000000 },
-    { date: '2024-08', actual: null, forecast: 4200000 },
-    { date: '2024-09', actual: null, forecast: 4500000 },
-    { date: '2024-10', actual: null, forecast: 4800000 },
-    { date: '2024-11', actual: null, forecast: 5200000 },
-    { date: '2024-12', actual: null, forecast: 6000000 },
-];
-
-// Mock data for product profitability
-const productProfitability = [
-    {
-        id: 1,
-        name: 'Riz local',
-        category: 'Alimentation',
-        revenue: 1200000,
-        cost: 840000,
-        profit: 360000,
-        margin: 30,
-        unitsSold: 2400,
-        averagePrice: 500,
-        averageCost: 350,
-    },
-    {
-        id: 2,
-        name: 'Huile végétale',
-        category: 'Alimentation',
-        revenue: 900000,
-        cost: 630000,
-        profit: 270000,
-        margin: 30,
-        unitsSold: 1800,
-        averagePrice: 500,
-        averageCost: 350,
-    },
-    {
-        id: 3,
-        name: 'Eau minérale',
-        category: 'Boissons',
-        revenue: 600000,
-        cost: 360000,
-        profit: 240000,
-        margin: 40,
-        unitsSold: 12000,
-        averagePrice: 50,
-        averageCost: 30,
-    },
-    {
-        id: 4,
-        name: 'Savon',
-        category: 'Hygiène',
-        revenue: 450000,
-        cost: 270000,
-        profit: 180000,
-        margin: 40,
-        unitsSold: 9000,
-        averagePrice: 50,
-        averageCost: 30,
-    },
-];
-
-// Mock data for category profitability
-const categoryProfitability = [
-    {
-        name: 'Alimentation',
-        revenue: 2100000,
-        cost: 1470000,
-        profit: 630000,
-        margin: 30,
-        products: 15,
-        topProduct: 'Riz local',
-    },
-    {
-        name: 'Boissons',
-        revenue: 1200000,
-        cost: 720000,
-        profit: 480000,
-        margin: 40,
-        products: 10,
-        topProduct: 'Eau minérale',
-    },
-    {
-        name: 'Hygiène',
-        revenue: 900000,
-        cost: 540000,
-        profit: 360000,
-        margin: 40,
-        products: 8,
-        topProduct: 'Savon',
-    },
-    {
-        name: 'Divers',
-        revenue: 600000,
-        cost: 420000,
-        profit: 180000,
-        margin: 30,
-        products: 12,
-        topProduct: 'Produit A',
-    },
-];
-
 function Reports() {
     const [tabValue, setTabValue] = useState(0);
     const [startDate, setStartDate] = useState(null);
@@ -300,7 +153,7 @@ function Reports() {
                                     Chiffre d'affaires total
                                 </Typography>
                                 <Typography variant="h5">
-                                    {salesData.reduce((sum, item) => sum + item.amount, 0).toLocaleString()} GNF
+                                    {/* Placeholder for total sales */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -312,7 +165,7 @@ function Reports() {
                                     Ventes moyennes journalières
                                 </Typography>
                                 <Typography variant="h5">
-                                    {(dailySales.reduce((sum, item) => sum + item.amount, 0) / 7).toLocaleString()} GNF
+                                    {/* Placeholder for average daily sales */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -324,7 +177,7 @@ function Reports() {
                                     Croissance mensuelle
                                 </Typography>
                                 <Typography variant="h5" color="success.main">
-                                    +15%
+                                    {/* Placeholder for monthly growth */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -336,8 +189,7 @@ function Reports() {
                                     Marge bénéficiaire moyenne
                                 </Typography>
                                 <Typography variant="h5">
-                                    {((profitData.reduce((sum, item) => sum + item.profit, 0) / 
-                                    profitData.reduce((sum, item) => sum + item.revenue, 0)) * 100).toFixed(1)}%
+                                    {/* Placeholder for average profit margin */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -349,7 +201,7 @@ function Reports() {
                                     Variation saisonnière
                                 </Typography>
                                 <Typography variant="h5" color="success.main">
-                                    +12%
+                                    {/* Placeholder for seasonal variation */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -361,7 +213,7 @@ function Reports() {
                                     Prévision mensuelle
                                 </Typography>
                                 <Typography variant="h5">
-                                    {forecastData[0].forecast.toLocaleString()} GNF
+                                    {/* Placeholder for forecasted sales */}
                                 </Typography>
                             </CardContent>
                         </Card>
@@ -388,7 +240,7 @@ function Reports() {
                             Évolution des ventes
                         </Typography>
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={salesData}>
+                            <LineChart data={[]}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" />
                                 <YAxis />
@@ -406,7 +258,7 @@ function Reports() {
                             Ventes par jour de la semaine
                         </Typography>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={dailySales}>
+                            <BarChart data={[]}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="day" />
                                 <YAxis />
@@ -426,7 +278,7 @@ function Reports() {
                         <ResponsiveContainer width="100%" height="100%">
                             <PieChart>
                                 <Pie
-                                    data={categoryData}
+                                    data={[]}
                                     cx="50%"
                                     cy="50%"
                                     labelLine={false}
@@ -435,9 +287,7 @@ function Reports() {
                                     fill="#8884d8"
                                     dataKey="value"
                                 >
-                                    {categoryData.map((entry, index) => (
-                                        <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
-                                    ))}
+                                    {/* Placeholder for category data */}
                                 </Pie>
                                 <Tooltip formatter={(value) => [`${value}%`, 'Pourcentage']} />
                                 <Legend />
@@ -452,7 +302,7 @@ function Reports() {
                             Évolution des marges bénéficiaires
                         </Typography>
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={profitData}>
+                            <LineChart data={[]}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" />
                                 <YAxis />
@@ -470,7 +320,7 @@ function Reports() {
                             Analyse saisonnière
                         </Typography>
                         <ResponsiveContainer width="100%" height="100%">
-                            <BarChart data={seasonalData}>
+                            <BarChart data={[]}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="year" />
                                 <YAxis />
@@ -491,7 +341,7 @@ function Reports() {
                             Prévisions de ventes
                         </Typography>
                         <ResponsiveContainer width="100%" height="100%">
-                            <LineChart data={forecastData}>
+                            <LineChart data={[]}>
                                 <CartesianGrid strokeDasharray="3 3" />
                                 <XAxis dataKey="date" />
                                 <YAxis />
@@ -511,7 +361,7 @@ function Reports() {
                                 Rentabilité par catégorie
                             </Typography>
                             <ResponsiveContainer width="100%" height="100%">
-                                <BarChart data={categoryProfitability}>
+                                <BarChart data={[]}>
                                     <CartesianGrid strokeDasharray="3 3" />
                                     <XAxis dataKey="name" />
                                     <YAxis yAxisId="left" orientation="left" stroke="#8884d8" />
@@ -547,17 +397,7 @@ function Reports() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {categoryProfitability.map((category) => (
-                                            <TableRow key={category.name}>
-                                                <TableCell>{category.name}</TableCell>
-                                                <TableCell align="right">{category.revenue.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{category.cost.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{category.profit.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{category.margin}%</TableCell>
-                                                <TableCell align="right">{category.products}</TableCell>
-                                                <TableCell>{category.topProduct}</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {/* Placeholder for category data */}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
@@ -583,19 +423,7 @@ function Reports() {
                                         </TableRow>
                                     </TableHead>
                                     <TableBody>
-                                        {productProfitability.map((product) => (
-                                            <TableRow key={product.id}>
-                                                <TableCell>{product.name}</TableCell>
-                                                <TableCell>{product.category}</TableCell>
-                                                <TableCell align="right">{product.unitsSold}</TableCell>
-                                                <TableCell align="right">{product.averagePrice.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{product.averageCost.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{product.revenue.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{product.cost.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{product.profit.toLocaleString()} GNF</TableCell>
-                                                <TableCell align="right">{product.margin}%</TableCell>
-                                            </TableRow>
-                                        ))}
+                                        {/* Placeholder for product data */}
                                     </TableBody>
                                 </Table>
                             </TableContainer>
@@ -607,9 +435,7 @@ function Reports() {
                             </Typography>
                             <ResponsiveContainer width="100%" height={300}>
                                 <BarChart
-                                    data={[...productProfitability]
-                                        .sort((a, b) => b.profit - a.profit)
-                                        .slice(0, 5)}
+                                    data={[]}
                                     layout="vertical"
                                 >
                                     <CartesianGrid strokeDasharray="3 3" />
@@ -642,16 +468,7 @@ function Reports() {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {salesData.map((row) => (
-                                    <TableRow key={row.date}>
-                                        <TableCell>{row.date}</TableCell>
-                                        <TableCell>Alimentation</TableCell>
-                                        <TableCell>Produit A</TableCell>
-                                        <TableCell align="right">100</TableCell>
-                                        <TableCell align="right">5000 GNF</TableCell>
-                                        <TableCell align="right">{row.amount.toLocaleString()} GNF</TableCell>
-                                    </TableRow>
-                                ))}
+                                {/* Placeholder for sales data */}
                             </TableBody>
                         </Table>
                     </TableContainer>

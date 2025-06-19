@@ -1,0 +1,3 @@
+ALTER TABLE commandes
+ADD COLUMN IF NOT EXISTS delivery_name VARCHAR(255) NULL,
+ADD COLUMN IF NOT EXISTS delivery_phone_number VARCHAR(20) NULL; 

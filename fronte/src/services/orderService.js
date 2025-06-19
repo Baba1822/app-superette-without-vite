@@ -31,36 +31,47 @@ export const orderService = {
   getOrders: async () => {
     try {
       const response = await axiosInstance.get('/api/orders');
+      if (!response.data || !Array.isArray(response.data)) {
+        console.warn('Réponse invalide du serveur pour getOrders:', response.data);
+        return [];
+      }
       const orders = response.data.map(order => ({
         ...order,
-        total: parseFloat(order.total),
-        items: order.items.map(item => ({
+        total: parseFloat(order.total) || 0,
+        items: Array.isArray(order.items) ? order.items.map(item => ({
           ...item,
-          price: parseFloat(item.price),
-          total: parseFloat(item.total)
-        }))
+          price: parseFloat(item.price) || 0,
+          total: parseFloat(item.total) || 0
+        })) : []
       }));
       return orders;
     } catch (error) {
       console.error('Erreur lors de la récupération des commandes:', error);
-      throw error;
+      if (error.response?.status === 401) {
+        console.warn('Utilisateur non authentifié pour récupérer les commandes');
+      }
+      return [];
     }
   },
 
   getOrderById: async (id) => {
     try {
       const response = await axiosInstance.get(`/api/orders/${id}`);
+      if (!response.data) {
+        console.warn('Réponse invalide du serveur pour getOrderById:', response.data);
+        return null;
+      }
       const order = response.data;
-      order.total = parseFloat(order.total);
-      order.items = order.items.map(item => ({
+      order.total = parseFloat(order.total) || 0;
+      order.items = Array.isArray(order.items) ? order.items.map(item => ({
         ...item,
-        price: parseFloat(item.price),
-        total: parseFloat(item.total)
-      }));
+        price: parseFloat(item.price) || 0,
+        total: parseFloat(item.total) || 0
+      })) : [];
       return order;
     } catch (error) {
       console.error(`Erreur lors de la récupération de la commande ${id}:`, error);
-      throw error;
+      return null;
     }
   },
 
@@ -76,20 +87,27 @@ export const orderService = {
 
   getAllOrders: async () => {
     try {
-      const response = await axiosInstance.get('/api/orders'); // Assuming this endpoint returns all orders for admin
+      const response = await axiosInstance.get('/api/orders');
+      if (!response.data || !Array.isArray(response.data)) {
+        console.warn('Réponse invalide du serveur pour getAllOrders:', response.data);
+        return [];
+      }
       const orders = response.data.map(order => ({
         ...order,
-        total: parseFloat(order.total),
-        items: order.items.map(item => ({
+        total: parseFloat(order.total) || 0,
+        items: Array.isArray(order.items) ? order.items.map(item => ({
           ...item,
-          price: parseFloat(item.price),
-          total: parseFloat(item.total)
-        }))
+          price: parseFloat(item.price) || 0,
+          total: parseFloat(item.total) || 0
+        })) : []
       }));
       return orders;
     } catch (error) {
       console.error('Erreur lors de la récupération de toutes les commandes:', error);
-      throw error;
+      if (error.response?.status === 401) {
+        console.warn('Utilisateur non authentifié pour récupérer toutes les commandes');
+      }
+      return [];
     }
   },
 };

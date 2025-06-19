@@ -153,7 +153,7 @@ app.use('/api/admin/dashboard', require('./routes/adminDashboard'));
 app.use('/api/admin/delivery', require('./routes/deliveryManagement'));
 
 // Sales management routes
-app.use('/api/admin/sales', require('./routes/salesManagement'));
+app.use('/api/sales', require('./routes/salesManagement'));
 
 // Finance routes
 app.use('/api/finance', require('./routes/finance'));

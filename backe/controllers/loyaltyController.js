@@ -4,7 +4,7 @@ exports.getClientLoyalty = async (req, res) => {
     try {
         const loyalty = await Loyalty.getClientLoyalty(req.params.clientId);
         if (!loyalty) {
-            return res.status(404).json({ error: 'Carte de fidélité non trouvée' });
+            return res.json({});
         }
         
         // Formater la réponse pour correspondre au frontend
@@ -34,21 +34,21 @@ function calculateTier(points) {
 
 exports.createLoyaltyCard = async (req, res) => {
     try {
-        const { clientId, initialPoints = 0, customerName, cardNumber } = req.body;
+        const { customerId, initialPoints = 0, customerName, cardNumber } = req.body;
         
         // Vérifier si une carte existe déjà
-        const existingCard = await Loyalty.getClientLoyalty(clientId);
+        const existingCard = await Loyalty.getClientLoyalty(customerId);
         if (existingCard) {
             return res.status(400).json({ error: 'Une carte de fidélité existe déjà pour ce client' });
         }
         
-        const newCard = await Loyalty.createLoyaltyCard(clientId, initialPoints);
+        const newCard = await Loyalty.createLoyaltyCard(customerId, initialPoints);
         
         const formattedCard = {
             id: newCard.id,
-            clientId: clientId,
-            customerName: customerName || `Client ${clientId}`,
-            cardNumber: cardNumber || `CARD${String(clientId).padStart(6, '0')}`,
+            clientId: customerId,
+            customerName: customerName || `Client ${customerId}`,
+            cardNumber: cardNumber || `CARD${String(customerId).padStart(6, '0')}`,
             points: initialPoints,
             tier: calculateTier(initialPoints),
             joinDate: new Date().toISOString().split('T')[0],

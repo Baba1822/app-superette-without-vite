@@ -31,6 +31,9 @@ import {
     Typography
 } from '@mui/material';
 import React, { useEffect, useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import SalesService from '../../../services/SalesService';
+import CustomerService from '../../../services/CustomerService';
 
 const SalesManagement = () => {
     const [sales, setSales] = useState([]);
@@ -65,47 +68,117 @@ const SalesManagement = () => {
         topCustomers: [],
     });
 
+    // Utiliser useQuery pour récupérer les données de ventes
+    const { data: fetchedSales = [], isLoading, error: salesError } = useQuery({
+        queryKey: ['sales'],
+        queryFn: SalesService.getAllSales,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        onSuccess: (data) => {
+            console.log('Données des ventes reçues du service:', data);
+            if (data && data.length > 0) {
+                console.log('Première vente:', data[0]);
+                console.log('Structure de la première vente:', {
+                    id: data[0].id,
+                    date: data[0].date,
+                    totalAmount: data[0].totalAmount,
+                    total_amount: data[0].total_amount,
+                    products: data[0].products,
+                    products_json: data[0].products_json
+                });
+            }
+        },
+        onError: (error) => {
+            console.error('Erreur lors du chargement des ventes:', error);
+            setSnackbar({
+                open: true,
+                message: `Erreur lors du chargement des ventes: ${error.message}`,
+                severity: 'error',
+            });
+        },
+    });
+
+    // Utiliser useQuery pour récupérer les données des clients
+    const { data: fetchedCustomers = [], isLoading: customersLoading, error: customersError } = useQuery({
+        queryKey: ['customers'],
+        queryFn: CustomerService.getAllCustomers,
+        staleTime: 5 * 60 * 1000, // 5 minutes
+        onError: (error) => {
+            console.error('Erreur lors du chargement des clients:', error);
+            setSnackbar({
+                open: true,
+                message: `Erreur lors du chargement des clients: ${error.message}`,
+                severity: 'error',
+            });
+        },
+    });
+
     useEffect(() => {
-        // Simuler le chargement des ventes (à remplacer par un appel API)
-        const mockSales = [
-            {
-                id: 1,
-                date: new Date(),
-                clientName: 'John Doe',
-                products: [
-                    { id: 1, name: 'Produit A', quantity: 2, price: 15000 },
-                    { id: 2, name: 'Produit B', quantity: 1, price: 25000 },
-                ],
-                totalAmount: 55000,
-                paymentMethod: 'cash',
-                status: 'completed',
-            },
-            // Autres ventes...
-        ];
-        setSales(mockSales);
-        calculateSalesStats(mockSales);
-    }, []);
+        if (fetchedSales.length > 0 && fetchedCustomers.length > 0) {
+            console.log('Données reçues - Ventes:', fetchedSales);
+            console.log('Données reçues - Clients:', fetchedCustomers);
+            
+            const salesWithCustomerDetails = fetchedSales.map(sale => {
+                const customer = fetchedCustomers.find(cust => cust.id === sale.clientId);
+                return {
+                    ...sale,
+                    customerAddress: customer ? customer.address : 'N/A',
+                    customerPhone: customer ? customer.phone : 'N/A',
+                };
+            });
+            setSales(salesWithCustomerDetails);
+            calculateSalesStats(salesWithCustomerDetails);
+        } else if (fetchedSales.length > 0) {
+            // If customers are not loaded, just set sales
+            console.log('Données reçues - Ventes seulement:', fetchedSales);
+            setSales(fetchedSales);
+            calculateSalesStats(fetchedSales);
+        }
+    }, [fetchedSales, fetchedCustomers]);
 
     const calculateSalesStats = (salesData) => {
         const now = new Date();
-        const today = now.toDateString();
-        const weekAgo = new Date(now.setDate(now.getDate() - 7));
-        const monthAgo = new Date(now.setMonth(now.getMonth() - 1));
+        const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+        const weekAgo = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+        const monthAgo = new Date(now.getFullYear(), now.getMonth() - 1, now.getDate());
+
+        console.log('Calcul des statistiques:', {
+            today: today.toISOString(),
+            weekAgo: weekAgo.toISOString(),
+            monthAgo: monthAgo.toISOString(),
+            salesCount: salesData.length,
+            sampleSale: salesData[0]
+        });
 
         const stats = {
+            totalSales: salesData.length,
+            totalRevenue: salesData.reduce((sum, sale) => sum + (sale.totalAmount || 0), 0),
             dailyTotal: salesData
-                .filter(sale => new Date(sale.date).toDateString() === today)
-                .reduce((sum, sale) => sum + sale.totalAmount, 0),
+                .filter(sale => {
+                    if (!sale.date) return false;
+                    const saleDate = new Date(sale.date);
+                    const saleDateOnly = new Date(saleDate.getFullYear(), saleDate.getMonth(), saleDate.getDate());
+                    return saleDateOnly.getTime() === today.getTime();
+                })
+                .reduce((sum, sale) => sum + (sale.totalAmount || 0), 0),
             weeklyTotal: salesData
-                .filter(sale => new Date(sale.date) >= weekAgo)
-                .reduce((sum, sale) => sum + sale.totalAmount, 0),
+                .filter(sale => {
+                    if (!sale.date) return false;
+                    const saleDate = new Date(sale.date);
+                    return saleDate >= weekAgo;
+                })
+                .reduce((sum, sale) => sum + (sale.totalAmount || 0), 0),
             monthlyTotal: salesData
-                .filter(sale => new Date(sale.date) >= monthAgo)
-                .reduce((sum, sale) => sum + sale.totalAmount, 0),
+                .filter(sale => {
+                    if (!sale.date) return false;
+                    const saleDate = new Date(sale.date);
+                    return saleDate >= monthAgo;
+                })
+                .reduce((sum, sale) => sum + (sale.totalAmount || 0), 0),
             bestSellingProducts: calculateBestSellingProducts(salesData),
             topCustomers: calculateTopCustomers(salesData),
         };
 
+        console.log('Statistiques calculées:', stats);
         setSalesStats(stats);
     };
 
@@ -136,14 +209,16 @@ const SalesManagement = () => {
     const calculateTopCustomers = (salesData) => {
         const customerSales = {};
         salesData.forEach(sale => {
-            if (!customerSales[sale.clientName]) {
-                customerSales[sale.clientName] = {
+            // Use sale.customerName if available, otherwise fallback to sale.clientName
+            const customerIdentifier = sale.customerName || sale.clientName || 'Client anonyme';
+            if (!customerSales[customerIdentifier]) {
+                customerSales[customerIdentifier] = {
                     totalPurchases: 0,
                     frequency: 0,
                 };
             }
-            customerSales[sale.clientName].totalPurchases += sale.totalAmount;
-            customerSales[sale.clientName].frequency += 1;
+            customerSales[customerIdentifier].totalPurchases += (sale.totalAmount || 0);
+            customerSales[customerIdentifier].frequency += 1;
         });
 
         return Object.entries(customerSales)
@@ -247,6 +322,8 @@ const SalesManagement = () => {
                     <TableRow>
                         <TableCell>Date</TableCell>
                         <TableCell>Client</TableCell>
+                        <TableCell>Adresse Client</TableCell>
+                        <TableCell>Téléphone Client</TableCell>
                         <TableCell>Produits</TableCell>
                         <TableCell>Montant Total</TableCell>
                         <TableCell>Méthode de Paiement</TableCell>
@@ -257,14 +334,19 @@ const SalesManagement = () => {
                 <TableBody>
                     {sales.map((sale) => (
                         <TableRow key={sale.id}>
-                            <TableCell>{new Date(sale.date).toLocaleDateString()}</TableCell>
-                            <TableCell>{sale.clientName}</TableCell>
+                            <TableCell>{sale.date ? new Date(sale.date).toLocaleDateString() : 'N/A'}</TableCell>
+                            <TableCell>{sale.clientName || 'N/A'}</TableCell>
+                            <TableCell>{sale.customerAddress || 'N/A'}</TableCell>
+                            <TableCell>{sale.customerPhone || 'N/A'}</TableCell>
                             <TableCell>
-                                {sale.products.map(p => `${p.name} (${p.quantity})`).join(', ')}
+                                {sale.products && Array.isArray(sale.products) 
+                                    ? sale.products.map(p => `${p.name || 'N/A'} (${p.quantity || 0})`).join(', ')
+                                    : 'N/A'
+                                }
                             </TableCell>
-                            <TableCell>{sale.totalAmount.toLocaleString()} FCFA</TableCell>
-                            <TableCell>{sale.paymentMethod}</TableCell>
-                            <TableCell>{sale.status}</TableCell>
+                            <TableCell>{(sale.totalAmount || 0).toLocaleString()} GNF</TableCell>
+                            <TableCell>{sale.paymentMethod || 'N/A'}</TableCell>
+                            <TableCell>{sale.status || 'N/A'}</TableCell>
                             <TableCell align="right">
                                 <IconButton
                                     color="primary"
@@ -294,32 +376,52 @@ const SalesManagement = () => {
 
     const renderDashboard = () => (
         <Grid container spacing={3}>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
+                <Card>
+                    <CardContent>
+                        <Typography variant="h6">Total Ventes</Typography>
+                        <Typography variant="h4">
+                            {salesStats.totalSales || 0}
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
+                <Card>
+                    <CardContent>
+                        <Typography variant="h6">Chiffre d'affaires</Typography>
+                        <Typography variant="h4">
+                            {(salesStats.totalRevenue || 0).toLocaleString()} GNF
+                        </Typography>
+                    </CardContent>
+                </Card>
+            </Grid>
+            <Grid item xs={12} md={3}>
                 <Card>
                     <CardContent>
                         <Typography variant="h6">Ventes Aujourd'hui</Typography>
                         <Typography variant="h4">
-                            {salesStats.dailyTotal.toLocaleString()} FCFA
+                            {(salesStats.dailyTotal || 0).toLocaleString()} GNF
                         </Typography>
                     </CardContent>
                 </Card>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
                 <Card>
                     <CardContent>
                         <Typography variant="h6">Ventes cette Semaine</Typography>
                         <Typography variant="h4">
-                            {salesStats.weeklyTotal.toLocaleString()} FCFA
+                            {(salesStats.weeklyTotal || 0).toLocaleString()} GNF
                         </Typography>
                     </CardContent>
                 </Card>
             </Grid>
-            <Grid item xs={12} md={4}>
+            <Grid item xs={12} md={3}>
                 <Card>
                     <CardContent>
                         <Typography variant="h6">Ventes ce Mois</Typography>
                         <Typography variant="h4">
-                            {salesStats.monthlyTotal.toLocaleString()} FCFA
+                            {(salesStats.monthlyTotal || 0).toLocaleString()} GNF
                         </Typography>
                     </CardContent>
                 </Card>
@@ -338,12 +440,12 @@ const SalesManagement = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {salesStats.bestSellingProducts.map((product) => (
+                                {salesStats.bestSellingProducts && salesStats.bestSellingProducts.map((product) => (
                                     <TableRow key={product.name}>
-                                        <TableCell>{product.name}</TableCell>
-                                        <TableCell>{product.quantity}</TableCell>
+                                        <TableCell>{product.name || 'N/A'}</TableCell>
+                                        <TableCell>{product.quantity || 0}</TableCell>
                                         <TableCell>
-                                            {product.revenue.toLocaleString()} FCFA
+                                            {(product.revenue || 0).toLocaleString()} GNF
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -366,13 +468,13 @@ const SalesManagement = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {salesStats.topCustomers.map((customer) => (
+                                {salesStats.topCustomers && salesStats.topCustomers.map((customer) => (
                                     <TableRow key={customer.name}>
-                                        <TableCell>{customer.name}</TableCell>
+                                        <TableCell>{customer.name || 'N/A'}</TableCell>
                                         <TableCell>
-                                            {customer.totalPurchases.toLocaleString()} FCFA
+                                            {(customer.totalPurchases || 0).toLocaleString()} GNF
                                         </TableCell>
-                                        <TableCell>{customer.frequency}</TableCell>
+                                        <TableCell>{customer.frequency || 0}</TableCell>
                                     </TableRow>
                                 ))}
                             </TableBody>
@@ -387,13 +489,6 @@ const SalesManagement = () => {
         <Box sx={{ p: 3 }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
                 <Typography variant="h4">Gestion des Ventes</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<AddIcon />}
-                    onClick={() => handleOpenDialog()}
-                >
-                    Nouvelle Vente
-                </Button>
             </Box>
 
             <Box sx={{ borderBottom: 1, borderColor: 'divider', mb: 3 }}>
