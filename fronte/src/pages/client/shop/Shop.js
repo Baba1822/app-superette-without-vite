@@ -131,6 +131,12 @@ const Shop = () => {
   const [deliveryName, setDeliveryName] = useState('');
   const [deliveryPhoneNumber, setDeliveryPhoneNumber] = useState('');
 
+  // États pour le paiement fractionné
+  const [installmentOptions, setInstallmentOptions] = useState({
+    numberOfInstallments: 2,
+    installmentAmount: 0,
+  });
+
   // États des dialogues
   const [showDeliveryDialog, setShowDeliveryDialog] = useState(false);
   const [showPaymentDialog, setShowPaymentDialog] = useState(false);
@@ -470,11 +476,26 @@ const Shop = () => {
   const promotionalProducts = promotionsData.filter(promo => promo?.promotion > 0);
 
   // Calculs
-  const totalCartAmount = Array.isArray(cart) ? cart.reduce((total, item) => {
-    const itemPrice = item?.price || item?.prix || 0;
-    const itemQuantity = item?.quantity || 0;
-    return total + (itemPrice * itemQuantity);
-  }, 0) : 0;
+  const totalCartAmount = useMemo(() => {
+    if (!Array.isArray(cart)) return 0;
+    return cart.reduce((total, item) => {
+      const itemPrice = item?.price || item?.prix || 0;
+      const itemQuantity = item?.quantity || 0;
+      return total + (itemPrice * itemQuantity);
+    }, 0);
+  }, [cart]);
+
+  const totalAmountWithDelivery = useMemo(() => totalCartAmount + deliveryFee, [totalCartAmount, deliveryFee]);
+
+  // Effet pour calculer le montant des versements
+  useEffect(() => {
+    if (paymentMethod === 'installment' && installmentOptions.numberOfInstallments > 0 && totalAmountWithDelivery > 0) {
+      setInstallmentOptions(prev => ({
+        ...prev,
+        installmentAmount: totalAmountWithDelivery / prev.numberOfInstallments,
+      }));
+    }
+  }, [paymentMethod, installmentOptions.numberOfInstallments, totalAmountWithDelivery]);
 
   // Gestion des fonctions de commande
   const handleAddToCart = async (product) => {
@@ -872,6 +893,11 @@ const Shop = () => {
                 control={<Radio />}
                 label="Orange Money"
               />
+              <FormControlLabel
+                value="installment"
+                control={<Radio />}
+                label="Paiement fractionné"
+              />
             </RadioGroup>
           </FormControl>
           {/* Étapes Orange Money */}
@@ -905,6 +931,36 @@ const Shop = () => {
               >
                 Payer avec Orange Money
               </Button>
+            </Box>
+          )}
+          {/* Étapes Paiement fractionné */}
+          {paymentMethod === 'installment' && (
+            <Box sx={{ mt: 2, p: 2, border: '1px dashed grey', borderRadius: 1 }}>
+              <Typography variant="h6" gutterBottom>
+                Options de paiement fractionné
+              </Typography>
+              <TextField
+                fullWidth
+                select
+                label="Nombre de versements"
+                value={installmentOptions.numberOfInstallments}
+                onChange={(e) =>
+                  setInstallmentOptions(prev => ({ ...prev, numberOfInstallments: Number(e.target.value) }))
+                }
+                helperText="Choisissez votre plan de paiement."
+                margin="normal"
+              >
+                {[2, 3, 4].map((n) => (
+                  <MenuItem key={n} value={n}>
+                    {n} versements
+                  </MenuItem>
+                ))}
+              </TextField>
+              <Alert severity="info" sx={{ mt: 2 }}>
+                Vous paierez {formatPrice(installmentOptions.installmentAmount)} par versement.
+                <br />
+                Le premier versement est dû aujourd'hui.
+              </Alert>
             </Box>
           )}
           <Box sx={{ mt: 2 }}>

@@ -1,9 +1,12 @@
 const Order = require('../models/Order');
+const { broadcast } = require('../services/websocketService');
 
 exports.createOrder = async (req, res) => {
     try {
-        const orderId = await Order.create(req.body);
-        res.status(201).json({ id: orderId });
+        const order = await Order.createOrder(req.body);
+        // Notifier via WebSocket
+        broadcast({ type: 'new_sale', data: order });
+        res.status(201).json({ id: order.id });
     } catch (error) {
         res.status(500).json({ error: 'Erreur lors de la création de la commande' });
     }

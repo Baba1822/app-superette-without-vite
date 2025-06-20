@@ -37,29 +37,11 @@ import React, { useEffect, useState } from 'react';
 import PaymentService from '../../../services/PaymentService'; // Importer le service
 
 const PAYMENT_METHODS = {
-    CARD: {
-        id: 'CARD',
-        label: 'Carte bancaire',
-        icon: <CreditCardIcon />,
-        color: 'primary'
-    },
-    MOBILE_MONEY: {
-        id: 'MOBILE_MONEY',
-        label: 'Mobile Money',
+    ORANGE_MONEY: {
+        id: 'ORANGE_MONEY',
+        label: 'Orange Money',
         icon: <PhoneIcon />,
         color: 'secondary'
-    },
-    BANK_TRANSFER: {
-        id: 'BANK_TRANSFER',
-        label: 'Virement bancaire',
-        icon: <BankIcon />,
-        color: 'info'
-    },
-    QR_CODE: {
-        id: 'QR_CODE',
-        label: 'Code QR',
-        icon: <QrCodeIcon />,
-        color: 'warning'
     },
     INSTALLMENT: {
         id: 'INSTALLMENT',
@@ -225,11 +207,11 @@ const PaymentManagement = () => {
     }
     
     const formatCurrency = (amount) => {
+        if (!amount || isNaN(amount)) return '0 GNF';
         return new Intl.NumberFormat('fr-GN', {
-            style: 'currency',
-            currency: 'XOF',
+            style: 'decimal',
             minimumFractionDigits: 0
-        }).format(amount);
+        }).format(amount) + ' GNF';
     };
 
     const renderPaymentMethodCard = (method) => (
@@ -397,7 +379,7 @@ const PaymentManagement = () => {
                                         setFormData({ ...formData, amount: e.target.value })
                                     }
                                     InputProps={{
-                                        endAdornment: 'FCFA'
+                                        endAdornment: 'GNF'
                                     }}
                                 />
                             </Grid>

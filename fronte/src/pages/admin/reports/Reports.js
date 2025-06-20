@@ -28,11 +28,14 @@ import {
     TextField,
     Typography,
 } from '@mui/material';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 import { AdapterDateFns } from '@mui/x-date-pickers/AdapterDateFns';
 import { DatePicker } from '@mui/x-date-pickers/DatePicker';
 import { LocalizationProvider } from '@mui/x-date-pickers/LocalizationProvider';
+import wsClient from '../../../services/WebSocketClient';
+import { useQuery } from '@tanstack/react-query';
+import { getSalesStats } from '../../../services/SalesService';
 
 function Reports() {
     const [tabValue, setTabValue] = useState(0);
@@ -62,6 +65,21 @@ function Reports() {
         // Implement print functionality
         window.print();
     };
+
+    // Hook React Query pour charger les stats
+    const { data: stats, refetch: refetchStats, isLoading: statsLoading, error: statsError } = useQuery({
+        queryKey: ['salesStats'],
+        queryFn: () => getSalesStats(),
+        staleTime: 1000 * 60 * 5,
+    });
+
+    useEffect(() => {
+        // Abonnement à l'événement de nouvelle vente
+        const unsubscribe = wsClient.subscribe('new_sale', () => {
+            refetchStats();
+        });
+        return () => unsubscribe && unsubscribe();
+    }, [refetchStats]);
 
     return (
         <LocalizationProvider dateAdapter={AdapterDateFns}>

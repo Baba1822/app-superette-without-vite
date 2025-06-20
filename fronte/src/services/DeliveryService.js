@@ -115,6 +115,59 @@ export const DeliveryService = {
       console.error('Erreur lors du calcul du coût:', error);
       throw error;
     }
+  },
+
+  // ====================
+  // Gestion des livreurs (couriers)
+  // ====================
+  getAllCouriers: async () => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/couriers`);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la récupération des livreurs:', error);
+      throw error;
+    }
+  },
+
+  createCourier: async (courierData) => {
+    try {
+      const response = await axios.post(`${API_BASE_URL}/couriers`, courierData);
+      return response.data;
+    } catch (error) {
+      console.error('Erreur lors de la création du livreur:', error);
+      throw error;
+    }
+  },
+
+  updateCourier: async (id, courierData) => {
+    try {
+      const response = await axios.put(`${API_BASE_URL}/couriers/${id}`, courierData);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la mise à jour du livreur ${id}:`, error);
+      throw error;
+    }
+  },
+
+  deleteCourier: async (id) => {
+    try {
+      const response = await axios.delete(`${API_BASE_URL}/couriers/${id}`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la suppression du livreur ${id}:`, error);
+      throw error;
+    }
+  },
+
+  getCourierHistory: async (id) => {
+    try {
+      const response = await axios.get(`${API_BASE_URL}/couriers/${id}/history`);
+      return response.data;
+    } catch (error) {
+      console.error(`Erreur lors de la récupération de l'historique du livreur ${id}:`, error);
+      throw error;
+    }
   }
 };
 

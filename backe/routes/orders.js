@@ -37,7 +37,7 @@ router.post('/', auth, async (req, res) => {
         
         // 3. Créer l'enregistrement de paiement associé
         const [paymentResult] = await connection.query(
-            'INSERT INTO paiements (commande_id, montant, methode, statut, date_creation) VALUES (?, ?, ?, ?, NOW())',
+            'INSERT INTO paiements (commande_id, montant, methode, statut, date_paiement) VALUES (?, ?, ?, ?, NOW())',
             [orderId, totalAmount, paymentMethod, 'complété'] // Statut initial du paiement
         );
         const paymentId = paymentResult.insertId;
@@ -53,6 +53,14 @@ router.post('/', auth, async (req, res) => {
 
         // Valider la transaction
         await connection.commit();
+        
+        // Notifier via WebSocket (nouvelle vente)
+        try {
+            const { broadcast } = require('../services/websocketService');
+            broadcast({ type: 'new_sale', orderId, paymentId, totalAmount, clientId, date: new Date() });
+        } catch (wsError) {
+            console.error('Erreur lors de la notification WebSocket:', wsError);
+        }
         
         console.log(`Commande ${orderId} et paiement ${paymentId} créés avec succès.`);
         res.status(201).json({ 
