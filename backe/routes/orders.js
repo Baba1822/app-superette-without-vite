@@ -6,66 +6,75 @@ const auth = require('../middleware/auth');
 // Créer une nouvelle commande
 router.post('/', auth, async (req, res) => {
     console.log('Requête de création de commande reçue.');
+    const connection = await pool.getConnection(); // Obtenir une connexion du pool
+
     try {
         const { items, totalAmount, paymentMethod, deliveryAddress, deliveryFee, note, deliveryQuarter, phoneNumber } = req.body;
-        const clientId = req.user.userId; // Récupérer l'ID client depuis le token authentifié
-        
+        const clientId = req.user.userId;
+
         // Démarrer une transaction
-        const connection = await pool.getConnection();
         await connection.beginTransaction();
 
-        try {
-            // Créer la commande
-            const [result] = await connection.query(
-                'INSERT INTO commandes (client_id, montant_total, methode_paiement, statut, delivery_address, delivery_fee, note, delivery_quarter, phone_number, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
-                [clientId, totalAmount, paymentMethod, 'en_attente', deliveryAddress, deliveryFee, note, deliveryQuarter, phoneNumber]
-            );
+        // 1. Créer la commande
+        const [orderResult] = await connection.query(
+            'INSERT INTO commandes (client_id, montant_total, methode_paiement, statut, delivery_address, delivery_fee, note, delivery_quarter, phone_number, date_creation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())',
+            [clientId, totalAmount, paymentMethod, 'en_attente', deliveryAddress, deliveryFee, note, deliveryQuarter, phoneNumber]
+        );
+        const orderId = orderResult.insertId;
 
-            // Créer les détails de la commande
-            const orderId = result.insertId;
-            const orderDetails = items.map(item => [
-                orderId,
-                item.productId,
-                item.quantity,
-                item.price,
-                item.price * item.quantity
-            ]);
+        // 2. Créer les détails de la commande
+        const orderDetails = items.map(item => [
+            orderId,
+            item.productId,
+            item.quantity,
+            item.price,
+            item.price * item.quantity
+        ]);
+        await connection.query(
+            'INSERT INTO details_commande (commande_id, produit_id, quantite, prix_unitaire, montant_total) VALUES ?',
+            [orderDetails]
+        );
+        
+        // 3. Créer l'enregistrement de paiement associé
+        const [paymentResult] = await connection.query(
+            'INSERT INTO paiements (commande_id, montant, methode, statut, date_creation) VALUES (?, ?, ?, ?, NOW())',
+            [orderId, totalAmount, paymentMethod, 'complété'] // Statut initial du paiement
+        );
+        const paymentId = paymentResult.insertId;
 
+        // Mettre à jour les stocks des produits
+        for (const item of items) {
             await connection.query(
-                'INSERT INTO details_commande (commande_id, produit_id, quantite, prix_unitaire, montant_total) VALUES ?',
-                [orderDetails] 
+                'UPDATE produits SET stock = stock - ? WHERE id = ?',
+                [item.quantity, item.productId]
             );
-
-            // Mettre à jour le stock
-            for (const item of items) {
-                // Vérifier le stock avant la décrémentation
-                const [productBefore] = await connection.query('SELECT stock_actuel FROM produits WHERE id = ?', [item.productId]);
-                const stockBefore = productBefore.length > 0 ? productBefore[0].stock_actuel : 'N/A';
-                console.log(`Produit ${item.productId}: Stock avant décrémentation = ${stockBefore}`);
-
-                console.log(`Décrémentation du stock: produit_id=${item.productId}, quantité=${item.quantity}`);
-                await connection.query(
-                    'UPDATE produits SET stock_actuel = stock_actuel - ? WHERE id = ?',
-                    [item.quantity, item.productId]
-                );
-
-                // Vérifier le stock après la décrémentation
-                const [productAfter] = await connection.query('SELECT stock_actuel FROM produits WHERE id = ?', [item.productId]);
-                const stockAfter = productAfter.length > 0 ? productAfter[0].stock_actuel : 'N/A';
-                console.log(`Produit ${item.productId}: Stock après décrémentation = ${stockAfter}`);
-            }
-
-            await connection.commit();
-            res.status(201).json({ id: orderId });
-        } catch (error) {
-            await connection.rollback();
-            throw error;
-        } finally {
-            connection.release();
+            // Optionnel : vérifier si le stock devient négatif et lever une erreur
         }
+
+        // Valider la transaction
+        await connection.commit();
+        
+        console.log(`Commande ${orderId} et paiement ${paymentId} créés avec succès.`);
+        res.status(201).json({ 
+            success: true, 
+            message: 'Commande et paiement créés avec succès', 
+            orderId: orderId,
+            paymentId: paymentId
+        });
+
     } catch (error) {
-        console.error('Erreur détaillée lors de la création de la commande:', error); 
-        res.status(500).json({ error: 'Erreur lors de la création de la commande', details: error.message });
+        // En cas d'erreur, annuler la transaction
+        if (connection) await connection.rollback(); 
+
+        console.error('Erreur lors de la création de la commande et du paiement:', error);
+        res.status(500).json({ 
+            success: false, 
+            message: 'Erreur serveur lors de la création de la commande.',
+            error: error.message 
+        });
+    } finally {
+        // Libérer la connexion dans tous les cas
+        if (connection) connection.release();
     }
 });
 

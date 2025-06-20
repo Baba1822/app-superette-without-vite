@@ -34,6 +34,7 @@ import {
     Typography
 } from '@mui/material';
 import React, { useEffect, useState } from 'react';
+import PaymentService from '../../../services/PaymentService'; // Importer le service
 
 const PAYMENT_METHODS = {
     CARD: {
@@ -79,7 +80,8 @@ const PaymentManagement = () => {
     const [payments, setPayments] = useState([]);
     const [openDialog, setOpenDialog] = useState(false);
     const [selectedPayment, setSelectedPayment] = useState(null);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(true); // Mettre à true initialement
+    const [error, setError] = useState(null); // Ajouter un état pour les erreurs
     const [snackbar, setSnackbar] = useState({
         open: false,
         message: '',
@@ -103,26 +105,27 @@ const PaymentManagement = () => {
         loadPayments();
     }, []);
 
+    useEffect(() => {
+        if (formData.amount && installmentData.numberOfInstallments) {
+            const newAmount = calculateInstallmentAmount(
+                parseFloat(formData.amount),
+                parseInt(installmentData.numberOfInstallments)
+            );
+            setInstallmentData(prev => ({ ...prev, installmentAmount: newAmount }));
+        }
+    }, [formData.amount, installmentData.numberOfInstallments]);
+
     const loadPayments = async () => {
         try {
-            // Simuler le chargement des paiements (à remplacer par un appel API)
-            const mockPayments = [
-                {
-                    id: 1,
-                    amount: 25000,
-                    method: 'CARD',
-                    status: 'COMPLETED',
-                    customerPhone: '771234567',
-                    customerEmail: 'client@example.com',
-                    description: 'Achat #12345',
-                    date: new Date().toISOString(),
-                    transactionId: 'TRX123456'
-                },
-                // Autres paiements...
-            ];
-            setPayments(mockPayments);
-        } catch (error) {
-            showSnackbar('Erreur lors du chargement des paiements', 'error');
+            setLoading(true);
+            setError(null);
+            const data = await PaymentService.getPaymentHistory();
+            setPayments(data.payments || []); // S'assurer que 'data' a une propriété 'payments'
+        } catch (err) {
+            setError(err.message || 'Une erreur est survenue lors du chargement des paiements.');
+            showSnackbar(err.message || 'Erreur lors du chargement des paiements', 'error');
+        } finally {
+            setLoading(false);
         }
     };
 
@@ -201,8 +204,28 @@ const PaymentManagement = () => {
         setSnackbar({ open: true, message, severity });
     };
 
+    // Affichage conditionnel
+    if (loading) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
+    if (error) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Alert severity="error">
+                    {error}
+                    <Button onClick={loadPayments} sx={{ ml: 2 }}>Réessayer</Button>
+                </Alert>
+            </Box>
+        );
+    }
+    
     const formatCurrency = (amount) => {
-        return new Intl.NumberFormat('fr-FR', {
+        return new Intl.NumberFormat('fr-GN', {
             style: 'currency',
             currency: 'XOF',
             minimumFractionDigits: 0
@@ -240,95 +263,126 @@ const PaymentManagement = () => {
     );
 
     const calculateInstallmentAmount = (totalAmount, numberOfInstallments) => {
-        const amount = totalAmount / numberOfInstallments;
-        setInstallmentData(prev => ({
-            ...prev,
-            installmentAmount: Math.ceil(amount)
-        }));
+        if (!totalAmount || !numberOfInstallments || numberOfInstallments === 0) return 0;
+        return (totalAmount / numberOfInstallments).toFixed(2);
     };
-
-    useEffect(() => {
-        if (formData.amount && installmentData.numberOfInstallments) {
-            calculateInstallmentAmount(
-                parseFloat(formData.amount),
-                parseInt(installmentData.numberOfInstallments)
-            );
-        }
-    }, [formData.amount, installmentData.numberOfInstallments]);
 
     return (
         <Box sx={{ p: 3 }}>
-            <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 3 }}>
-                <Typography variant="h4">Gestion des Paiements</Typography>
-                <Button
-                    variant="contained"
-                    startIcon={<ReceiptIcon />}
-                    onClick={() => handleOpenDialog()}
-                >
-                    Nouveau Paiement
-                </Button>
-            </Box>
+            <Paper sx={{ p: 2 }}>
+                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <Typography variant="h5" gutterBottom>
+                        Gestion des Paiements
+                    </Typography>
+                    <Box>
+                        <IconButton onClick={loadPayments} color="primary">
+                            <RefreshIcon />
+                        </IconButton>
+                        <Button
+                            variant="contained"
+                            onClick={() => handleOpenDialog()}
+                        >
+                            Enregistrer un Paiement Manuel
+                        </Button>
+                    </Box>
+                </Box>
+            </Paper>
 
-            <TableContainer component={Paper}>
+            <Grid container spacing={3} sx={{ mt: 2 }}>
+                {Object.values(PAYMENT_METHODS).map(renderPaymentMethodCard)}
+            </Grid>
+
+            <TableContainer component={Paper} sx={{ mt: 3 }}>
                 <Table>
                     <TableHead>
                         <TableRow>
+                            <TableCell>ID Transaction</TableCell>
                             <TableCell>Date</TableCell>
-                            <TableCell>Montant</TableCell>
-                            <TableCell>Méthode</TableCell>
                             <TableCell>Client</TableCell>
-                            <TableCell>Description</TableCell>
-                            <TableCell>Statut</TableCell>
-                            <TableCell>Actions</TableCell>
+                            <TableCell>Méthode</TableCell>
+                            <TableCell align="right">Montant</TableCell>
+                            <TableCell align="center">Statut</TableCell>
+                            <TableCell align="center">Actions</TableCell>
                         </TableRow>
                     </TableHead>
                     <TableBody>
-                        {payments.map((payment) => (
-                            <TableRow key={payment.id}>
-                                <TableCell>
-                                    {new Date(payment.date).toLocaleDateString('fr-FR')}
-                                </TableCell>
-                                <TableCell>{formatCurrency(payment.amount)}</TableCell>
-                                <TableCell>
-                                    <Chip
-                                        icon={PAYMENT_METHODS[payment.method].icon}
-                                        label={PAYMENT_METHODS[payment.method].label}
-                                        color={PAYMENT_METHODS[payment.method].color}
-                                        size="small"
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <Typography variant="body2">{payment.customerEmail}</Typography>
-                                    <Typography variant="caption" color="textSecondary">
-                                        {payment.customerPhone}
-                                    </Typography>
-                                </TableCell>
-                                <TableCell>{payment.description}</TableCell>
-                                <TableCell>
-                                    <Chip
-                                        label={PAYMENT_STATUS[payment.status].label}
-                                        color={PAYMENT_STATUS[payment.status].color}
-                                        size="small"
-                                    />
-                                </TableCell>
-                                <TableCell>
-                                    <IconButton
-                                        size="small"
-                                        onClick={() => handleRefund(payment.id)}
-                                        disabled={payment.status !== 'COMPLETED'}
-                                    >
-                                        <RefreshIcon />
-                                    </IconButton>
+                        {payments.length > 0 ? (
+                            payments.map((payment) => {
+                                const method = PAYMENT_METHODS[payment.method];
+                                const status = PAYMENT_STATUS[payment.status];
+                                return (
+                                    <TableRow key={payment.id}>
+                                        <TableCell>
+                                            <Typography variant="body2" fontWeight="bold">
+                                                {payment.transactionId || payment.id}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            {new Date(payment.date).toLocaleDateString('fr-FR')}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Typography variant="body2">{payment.customerEmail}</Typography>
+                                            <Typography variant="caption" color="textSecondary">
+                                                {payment.customerPhone}
+                                            </Typography>
+                                        </TableCell>
+                                        <TableCell>
+                                            <Chip
+                                                icon={method?.icon}
+                                                label={method?.label || payment.method}
+                                                color={method?.color || 'default'}
+                                                size="small"
+                                            />
+                                        </TableCell>
+                                        <TableCell align="right">
+                                            {formatCurrency(payment.amount)}
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Chip
+                                                label={status?.label || payment.status}
+                                                color={status?.color || 'default'}
+                                            />
+                                        </TableCell>
+                                        <TableCell align="center">
+                                            <Button
+                                                variant="outlined"
+                                                size="small"
+                                                startIcon={<ReceiptIcon />}
+                                                onClick={() => handleOpenDialog(payment)}
+                                                sx={{ mr: 1 }}
+                                            >
+                                                Détails
+                                            </Button>
+                                            {payment.status === 'COMPLETED' && (
+                                                <Button
+                                                    variant="contained"
+                                                    color="secondary"
+                                                    size="small"
+                                                    onClick={() => handleRefund(payment.id)}
+                                                    disabled={loading}
+                                                >
+                                                    Rembourser
+                                                </Button>
+                                            )}
+                                        </TableCell>
+                                    </TableRow>
+                                );
+                            })
+                        ) : (
+                            <TableRow>
+                                <TableCell colSpan={7} align="center">
+                                    <Typography>Aucun paiement trouvé.</Typography>
                                 </TableCell>
                             </TableRow>
-                        ))}
+                        )}
                     </TableBody>
                 </Table>
             </TableContainer>
 
+            {/* Dialog de paiement */}
             <Dialog open={openDialog} onClose={handleCloseDialog} maxWidth="sm" fullWidth>
                 <DialogTitle>
-                    {selectedPayment ? 'Modifier le Paiement' : 'Nouveau Paiement'}
+                    {selectedPayment ? 'Détails du Paiement' : 'Nouveau Paiement Manuel'}
                 </DialogTitle>
                 <DialogContent>
                     <Box sx={{ mt: 2 }}>
@@ -459,10 +513,12 @@ const PaymentManagement = () => {
                 open={snackbar.open}
                 autoHideDuration={6000}
                 onClose={() => setSnackbar({ ...snackbar, open: false })}
+                anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
             >
                 <Alert
                     onClose={() => setSnackbar({ ...snackbar, open: false })}
                     severity={snackbar.severity}
+                    sx={{ width: '100%' }}
                 >
                     {snackbar.message}
                 </Alert>
@@ -471,4 +527,4 @@ const PaymentManagement = () => {
     );
 };
 
-export default PaymentManagement; 
+export default PaymentManagement;

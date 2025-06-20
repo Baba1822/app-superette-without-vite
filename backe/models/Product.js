@@ -90,89 +90,148 @@ class Product {
     }
 
     static async create(productData) {
-        const [result] = await pool.query(
-            'INSERT INTO produits (nom, categorie_id, prix, stock, description, stock_min, image_url, ' +
-            'saison, date_debut_saison, date_fin_saison, promotion, type_promotion, valeur_promotion, ' +
-            'date_debut_promo, date_fin_promo, date_peremption) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
-            [
-                productData.nom, 
-                productData.categorie_id, 
-                productData.prix, 
-                productData.stock,
-                productData.description,
-                productData.stock_min || 0,
-                productData.image_url || 'default-product.jpg',
-                productData.saison || false,
-                productData.date_debut_saison,
-                productData.date_fin_saison,
-                productData.promotion || false,
-                productData.type_promotion,
-                productData.valeur_promotion,
-                productData.date_debut_promo,
-                productData.date_fin_promo,
-                productData.date_peremption
-            ]
-        );
-        return result.insertId;
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
+
+            // Insérer le produit
+            const [result] = await connection.query(
+                'INSERT INTO produits (nom, categorie_id, prix, stock, description, stock_min, image_url, ' +
+                'saison, date_debut_saison, date_fin_saison, promotion, type_promotion, valeur_promotion, ' +
+                'date_debut_promo, date_fin_promo, date_peremption) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                [
+                    productData.nom, 
+                    productData.categorie_id, 
+                    productData.prix, 
+                    productData.stock,
+                    productData.description,
+                    productData.stock_min || 0,
+                    productData.image_url || 'default-product.jpg',
+                    productData.saison || false,
+                    productData.date_debut_saison,
+                    productData.date_fin_saison,
+                    productData.promotion || false,
+                    productData.type_promotion,
+                    productData.valeur_promotion,
+                    productData.date_debut_promo,
+                    productData.date_fin_promo,
+                    productData.date_peremption
+                ]
+            );
+
+            const productId = result.insertId;
+
+            // Récupérer un utilisateur admin
+            const [adminUsers] = await connection.query(
+                'SELECT id FROM utilisateurs WHERE type = "admin" LIMIT 1'
+            );
+
+            if (adminUsers.length === 0) {
+                throw new Error('Aucun utilisateur administrateur trouvé pour enregistrer le mouvement de stock');
+            }
+
+            const adminId = adminUsers[0].id;
+
+            // Créer un mouvement de stock initial si le stock est positif
+            if (productData.stock > 0) {
+                await connection.query(
+                    'INSERT INTO mouvements_stock (produit_id, type_mouvement, quantite, date_mouvement, utilisateur_id) VALUES (?, ?, ?, NOW(), ?)',
+                    [productId, 'initial', productData.stock, adminId]
+                );
+            }
+
+            await connection.commit();
+            return productId;
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 
     static async delete(id) {
+        const connection = await pool.getConnection();
         try {
-            // Supprimer les images associées
-            await pool.query('DELETE FROM images WHERE produit_id = ?', [id]);
+            await connection.beginTransaction();
+
+            // Supprimer d'abord les mouvements de stock associés
+            await connection.query(
+                'DELETE FROM mouvements_stock WHERE produit_id = ?',
+                [id]
+            );
             
-            // Supprimer le produit
-            await pool.query('DELETE FROM produits WHERE id = ?', [id]);
-            
-            return true;
+            // Ensuite supprimer le produit
+            await connection.query(
+                'DELETE FROM produits WHERE id = ?',
+                [id]
+            );
+
+            await connection.commit();
         } catch (error) {
-            console.error('Erreur lors de la suppression du produit:', {
-                message: error.message,
-                stack: error.stack,
-                productId: id,
-                timestamp: new Date().toISOString()
-            });
+            await connection.rollback();
             throw error;
+        } finally {
+            connection.release();
         }
     }
 
     static async update(id, productData) {
-        await pool.query(
-            'UPDATE produits SET nom = ?, categorie_id = ?, prix = ?, stock = ?, description = ?, ' +
-            'stock_min = ?, image_url = ?, saison = ?, date_debut_saison = ?, date_fin_saison = ?, ' +
-            'promotion = ?, type_promotion = ?, valeur_promotion = ?, date_debut_promo = ?, ' +
-            'date_fin_promo = ?, date_peremption = ? WHERE id = ?',
-            [
-                productData.nom,
-                productData.categorie_id,
-                productData.prix,
-                productData.stock,
-                productData.description,
-                productData.stock_min,
-                productData.image_url,
-                productData.saison,
-                productData.date_debut_saison,
-                productData.date_fin_saison,
-                productData.promotion,
-                productData.type_promotion,
-                productData.valeur_promotion,
-                productData.date_debut_promo,
-                productData.date_fin_promo,
-                productData.date_peremption,
-                id
-            ]
-        );
-    }
+        const connection = await pool.getConnection();
+        try {
+            await connection.beginTransaction();
 
-    static async delete(id) {
-        // Mettre à jour les mouvements de stock liés
-        await pool.query(
-            'UPDATE mouvements_stock SET produit_id = NULL WHERE produit_id = ?',
-            [id]
-        );
-        
-        // Supprimer le produit
-        await pool.query('DELETE FROM produits WHERE id = ?', [id]);
+            // Récupérer l'ancien stock
+            const [oldProduct] = await connection.query(
+                'SELECT stock FROM produits WHERE id = ?',
+                [id]
+            );
+
+            // Calculer la différence de stock
+            const stockDiff = productData.stock - (oldProduct[0]?.stock || 0);
+
+            // Mettre à jour le produit
+            await connection.query(
+                'UPDATE produits SET nom = ?, categorie_id = ?, prix = ?, stock = ?, description = ?, ' +
+                'stock_min = ?, image_url = ?, saison = ?, date_debut_saison = ?, date_fin_saison = ?, ' +
+                'promotion = ?, type_promotion = ?, valeur_promotion = ?, date_debut_promo = ?, ' +
+                'date_fin_promo = ?, date_peremption = ? WHERE id = ?',
+                [
+                    productData.nom,
+                    productData.categorie_id,
+                    productData.prix,
+                    productData.stock,
+                    productData.description,
+                    productData.stock_min,
+                    productData.image_url,
+                    productData.saison,
+                    productData.date_debut_saison,
+                    productData.date_fin_saison,
+                    productData.promotion,
+                    productData.type_promotion,
+                    productData.valeur_promotion,
+                    productData.date_debut_promo,
+                    productData.date_fin_promo,
+                    productData.date_peremption,
+                    id
+                ]
+            );
+
+            // Créer un mouvement de stock si le stock a changé
+            if (stockDiff !== 0) {
+                await connection.query(
+                    'INSERT INTO mouvements_stock (produit_id, type_mouvement, quantite, date_mouvement) VALUES (?, ?, ?, NOW())',
+                    [id, stockDiff > 0 ? 'ajustement_positif' : 'ajustement_negatif', Math.abs(stockDiff)]
+                );
+            }
+
+            await connection.commit();
+        } catch (error) {
+            await connection.rollback();
+            throw error;
+        } finally {
+            connection.release();
+        }
     }
 
     static async findByCategory(categoryId) {

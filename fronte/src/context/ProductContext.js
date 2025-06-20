@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
-import { productService } from '../services/productService';
+import wsClient from '../services/WebSocketClient';
 
 const ProductContext = createContext();
 
@@ -10,9 +10,12 @@ export const ProductProvider = ({ children }) => {
   const [stockUpdated, setStockUpdated] = useState(null);
 
   useEffect(() => {
-    const unsubscribe = productService.subscribeToProducts((update) => {
-      queryClient.invalidateQueries(['products']);
+    const unsubscribe = wsClient.subscribe('product-update', (update) => {
+      console.log('Received product update via WebSocket:', update);
       
+      // Invalidate queries to refetch product data
+      queryClient.invalidateQueries({ queryKey: ['products'] });
+
       if (update.action === 'created') {
         setNewProductAdded(update.product);
       } else if (update.action === 'updated' && update.product.stock !== undefined) {
@@ -20,7 +23,10 @@ export const ProductProvider = ({ children }) => {
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      console.log('Unsubscribing from product updates.');
+      unsubscribe();
+    };
   }, [queryClient]);
 
   const clearNewProduct = () => {

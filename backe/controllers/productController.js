@@ -3,6 +3,7 @@ const { validationResult } = require('express-validator');
 const fs = require('fs').promises;
 const path = require('path');
 const multer = require('multer');
+const { broadcast } = require('../services/websocketService');
 
 // Configuration de multer pour le stockage des images
 const storage = multer.diskStorage({
@@ -161,11 +162,20 @@ exports.createProduct = async (req, res) => {
   }
 
   try {
-    const productId = await Product.create(req.body);
+    const newProduct = { ...req.body };
+    const productId = await Product.create(newProduct);
+    const createdProduct = await Product.getById(productId);
+
+    // Broadcast the update
+    broadcast({
+      event: 'product-update',
+      payload: { action: 'created', product: createdProduct }
+    });
+
     res.status(201).json({
       success: true,
       message: 'Produit créé avec succès',
-      productId: productId
+      product: createdProduct
     });
   } catch (error) {
     console.error('Erreur dans createProduct:', error);
@@ -197,9 +207,18 @@ exports.updateProduct = async (req, res) => {
     }
 
     await Product.update(req.params.id, req.body);
+    const updatedProduct = await Product.getById(req.params.id);
+
+    // Broadcast the update
+    broadcast({
+      event: 'product-update',
+      payload: { action: 'updated', product: updatedProduct }
+    });
+
     res.json({
       success: true,
-      message: 'Produit mis à jour avec succès'
+      message: 'Produit mis à jour avec succès',
+      product: updatedProduct
     });
   } catch (error) {
     console.error('Erreur dans updateProduct:', error);
@@ -244,6 +263,12 @@ exports.deleteProduct = async (req, res) => {
 
     await Product.delete(productId);
     
+    // Broadcast the update
+    broadcast({
+      event: 'product-update',
+      payload: { action: 'deleted', productId: productId }
+    });
+    
     res.status(200).json({
       success: true,
       message: 'Produit supprimé avec succès',
@@ -279,6 +304,13 @@ exports.uploadImage = async (req, res) => {
     // Construire le chemin complet de l'image
     const imagePath = `/uploads/products/${req.file.filename}`;
     await Product.update(req.params.id, { image_url: imagePath });
+    const updatedProduct = await Product.getById(req.params.id);
+
+    // Broadcast the update
+    broadcast({
+      event: 'product-update',
+      payload: { action: 'updated', product: updatedProduct }
+    });
 
     // Construire l'URL complète de l'image
     const imageUrl = `${process.env.API_URL}${imagePath}`;
@@ -286,7 +318,8 @@ exports.uploadImage = async (req, res) => {
     res.json({
       success: true,
       message: 'Image téléchargée avec succès',
-      image_url: imageUrl
+      image_url: imageUrl,
+      product: updatedProduct
     });
   } catch (error) {
     console.error('Erreur dans uploadImage:', error);

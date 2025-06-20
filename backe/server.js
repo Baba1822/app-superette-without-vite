@@ -6,6 +6,8 @@ const { validate } = require('./utils/validators');
 const pool = require('./config/database');
 const path = require('path');
 const fs = require('fs');
+const http = require('http');
+const { initializeWebSocket } = require('./services/websocketService');
 
 // Configuration du port
 const PORT = process.env.PORT || 5000;
@@ -18,6 +20,10 @@ const { register, login, getCurrentUser } = require('./controllers/authControlle
 
 // Initialiser l'application Express
 const app = express();
+const server = http.createServer(app);
+
+// Initialiser le serveur WebSocket et l'attacher au serveur HTTP
+initializeWebSocket(server);
 
 // Configuration CORS avec options détaillées
 const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3000';
@@ -211,36 +217,11 @@ const isPortAvailable = (port) => new Promise((resolve, reject) => {
 });
 
 // Démarrer le serveur
-const server = app.listen(PORT, () => {
+server.listen(PORT, () => {
     console.log(`Serveur en cours d'exécution sur le port ${PORT}`);
     console.log(`URL du serveur: http://localhost:${PORT}`);
     console.log(`Limite de taille des requêtes: 50MB`);
     console.log(`Route de test: http://localhost:${PORT}/api/health`);
-});
-
-// Gestion des erreurs de serveur
-server.on('error', (error) => {
-    if (error.syscall !== 'listen') {
-        throw error;
-    }
-    
-    const bind = typeof PORT === 'string' 
-        ? 'Pipe ' + PORT 
-        : 'Port ' + PORT;
-
-    // Gérer les erreurs spécifiques
-    switch (error.code) {
-        case 'EACCES':
-            console.error(bind + ' nécessite des privilèges d\'administrateur');
-            process.exit(1);
-            break;
-        case 'EADDRINUSE':
-            console.error(bind + ' est déjà en cours d\'utilisation');
-            process.exit(1);
-            break;
-        default:
-            throw error;
-    }
 });
 
 // Gestion propre de l'arrêt du serveur
@@ -260,4 +241,4 @@ process.on('SIGINT', () => {
     });
 });
 
-module.exports = app;
+module.exports = { app, server };

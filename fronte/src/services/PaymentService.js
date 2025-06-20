@@ -1,4 +1,4 @@
-import axios from 'axios';
+import axiosInstance from './apiClient';
 
 class PaymentService {
     constructor() {
@@ -8,10 +8,7 @@ class PaymentService {
     // Initialiser un nouveau paiement
     async initiatePayment(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/initiate`,
-                paymentData
-            );
+            const response = await axiosInstance.post('/payments/initiate', paymentData);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de l\'initialisation du paiement');
@@ -21,13 +18,10 @@ class PaymentService {
     // Traiter un paiement par carte bancaire
     async processCardPayment(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/card/process`,
-                {
-                    ...paymentData,
-                    paymentMethod: 'CARD'
-                }
-            );
+            const response = await axiosInstance.post('/payments/card/process', {
+                ...paymentData,
+                paymentMethod: 'CARD'
+            });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors du traitement du paiement par carte');
@@ -37,13 +31,10 @@ class PaymentService {
     // Traiter un paiement par mobile money
     async processMobileMoneyPayment(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/mobile-money/process`,
-                {
-                    ...paymentData,
-                    paymentMethod: 'MOBILE_MONEY'
-                }
-            );
+            const response = await axiosInstance.post('/payments/mobile-money/process', {
+                ...paymentData,
+                paymentMethod: 'MOBILE_MONEY'
+            });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors du traitement du paiement mobile');
@@ -53,13 +44,10 @@ class PaymentService {
     // Traiter un paiement par virement bancaire
     async processBankTransfer(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/bank-transfer/process`,
-                {
-                    ...paymentData,
-                    paymentMethod: 'BANK_TRANSFER'
-                }
-            );
+            const response = await axiosInstance.post('/payments/bank-transfer/process', {
+                ...paymentData,
+                paymentMethod: 'BANK_TRANSFER'
+            });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors du traitement du virement bancaire');
@@ -69,10 +57,7 @@ class PaymentService {
     // Générer un code QR pour le paiement
     async generateQRCode(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/qr-code/generate`,
-                paymentData
-            );
+            const response = await axiosInstance.post('/payments/qr-code/generate', paymentData);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la génération du code QR');
@@ -82,9 +67,7 @@ class PaymentService {
     // Vérifier le statut d'un paiement
     async checkPaymentStatus(paymentId) {
         try {
-            const response = await axios.get(
-                `${this.apiUrl}/payments/${paymentId}/status`
-            );
+            const response = await axiosInstance.get(`/payments/${paymentId}/status`);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la vérification du statut du paiement');
@@ -94,10 +77,10 @@ class PaymentService {
     // Récupérer l'historique des paiements
     async getPaymentHistory(filters = {}) {
         try {
-            const response = await axios.get(`${this.apiUrl}/payments/history`, {
+            const response = await axiosInstance.get('/payments', {
                 params: filters
             });
-            return response.data;
+            return { payments: response.data };
         } catch (error) {
             throw new Error('Erreur lors de la récupération de l\'historique des paiements');
         }
@@ -106,10 +89,7 @@ class PaymentService {
     // Effectuer un remboursement
     async processRefund(paymentId, refundData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/${paymentId}/refund`,
-                refundData
-            );
+            const response = await axiosInstance.post(`/payments/${paymentId}/refund`, refundData);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors du traitement du remboursement');
@@ -119,9 +99,7 @@ class PaymentService {
     // Récupérer les détails d'un paiement
     async getPaymentDetails(paymentId) {
         try {
-            const response = await axios.get(
-                `${this.apiUrl}/payments/${paymentId}`
-            );
+            const response = await axiosInstance.get(`/payments/${paymentId}`);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la récupération des détails du paiement');
@@ -131,10 +109,7 @@ class PaymentService {
     // Valider les informations de paiement
     async validatePaymentInfo(paymentData) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/validate`,
-                paymentData
-            );
+            const response = await axiosInstance.post('/payments/validate', paymentData);
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la validation des informations de paiement');
@@ -144,13 +119,10 @@ class PaymentService {
     // Générer un reçu de paiement
     async generateReceipt(paymentId, format = 'pdf') {
         try {
-            const response = await axios.get(
-                `${this.apiUrl}/payments/${paymentId}/receipt`,
-                {
-                    params: { format },
-                    responseType: 'blob'
-                }
-            );
+            const response = await axiosInstance.get(`/payments/${paymentId}/receipt`, {
+                params: { format },
+                responseType: 'blob'
+            });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la génération du reçu');
@@ -160,10 +132,7 @@ class PaymentService {
     // Envoyer un reçu par email
     async sendReceiptByEmail(paymentId, email) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/${paymentId}/send-receipt`,
-                { email }
-            );
+            const response = await axiosInstance.post(`/payments/${paymentId}/send-receipt`, { email });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de l\'envoi du reçu par email');
@@ -173,7 +142,7 @@ class PaymentService {
     // Obtenir les statistiques de paiement
     async getPaymentStats(startDate, endDate) {
         try {
-            const response = await axios.get(`${this.apiUrl}/payments/stats`, {
+            const response = await axiosInstance.get('/payments/stats', {
                 params: { startDate, endDate }
             });
             return response.data;
@@ -185,10 +154,7 @@ class PaymentService {
     // Configurer les webhooks de paiement
     async configureWebhook(webhookUrl, events) {
         try {
-            const response = await axios.post(
-                `${this.apiUrl}/payments/webhooks/configure`,
-                { webhookUrl, events }
-            );
+            const response = await axiosInstance.post('/payments/webhooks/configure', { webhookUrl, events });
             return response.data;
         } catch (error) {
             throw new Error('Erreur lors de la configuration du webhook');

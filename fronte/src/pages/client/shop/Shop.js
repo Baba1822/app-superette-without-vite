@@ -137,6 +137,9 @@ const Shop = () => {
   const [showOrderDialog, setShowOrderDialog] = useState(false);
   const [showClientOrdersDialog, setShowClientOrdersDialog] = useState(false);
 
+  // Étapes Orange Money
+  const [orangeMoneyPhone, setOrangeMoneyPhone] = useState('');
+
   // Fonction utilitaire pour le formatage des prix
   const formatPrice = (amount) => {
     return `${amount?.toLocaleString()} GNF`;
@@ -372,6 +375,7 @@ const Shop = () => {
 
       const newOrder = await orderService.createOrder(orderData);
       queryClient.invalidateQueries(['orders', 'clientOrders']);
+      await queryClient.invalidateQueries(['products']);
       showNotification('Commande passée avec succès !', 'success');
 
       refetchClientOrders().then(async ({ data: updatedOrders }) => {
@@ -392,6 +396,8 @@ const Shop = () => {
 
       clearCartAction();
       handleCloseOrderDialog();
+      await queryClient.invalidateQueries(['products']);
+      showNotification('Stock mis à jour après la commande.', 'info');
       navigate('/client/orders');
     } catch (error) {
       console.error('Erreur lors de la création de la commande:', error);
@@ -868,6 +874,39 @@ const Shop = () => {
               />
             </RadioGroup>
           </FormControl>
+          {/* Étapes Orange Money */}
+          {paymentMethod === 'orange_money' && (
+            <Box sx={{ mt: 2 }}>
+              <TextField
+                fullWidth
+                label="Numéro Orange Money"
+                value={orangeMoneyPhone}
+                onChange={e => setOrangeMoneyPhone(e.target.value)}
+                margin="normal"
+                required
+              />
+              <Button
+                variant="contained"
+                color="warning"
+                fullWidth
+                sx={{ mt: 2 }}
+                onClick={async () => {
+                  if (!orangeMoneyPhone) {
+                    showNotification('Veuillez saisir le numéro Orange Money', 'error');
+                    return;
+                  }
+                  showNotification('Paiement en cours...', 'info');
+                  // Simulation du paiement
+                  await new Promise(res => setTimeout(res, 2000));
+                  showNotification('Paiement Orange Money réussi !', 'success');
+                  setShowPaymentDialog(false);
+                  setShowOrderDialog(true);
+                }}
+              >
+                Payer avec Orange Money
+              </Button>
+            </Box>
+          )}
           <Box sx={{ mt: 2 }}>
             <Typography variant="body1">
               Sous-total: {formatPrice(totalCartAmount)}
