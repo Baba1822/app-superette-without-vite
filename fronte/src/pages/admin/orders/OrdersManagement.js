@@ -71,20 +71,20 @@ const OrdersManagement = () => {
       if (variables.status.status === 'delivered' && selectedOrder) {
         try {
           const saleData = {
-            date: new Date(selectedOrder.createdAt),
-            clientId: selectedOrder.clientId || 'N/A', // Assurez-vous que clientId est disponible dans l'objet de commande
-            clientName: selectedOrder.clientName || selectedOrder.deliveryAddress || 'N/A',
+            date: selectedOrder.date_creation || new Date().toISOString(),
+            clientId: selectedOrder.client_id || null, 
+            clientName: selectedOrder.client_nom ? `${selectedOrder.client_prenom || ''} ${selectedOrder.client_nom}`.trim() : (selectedOrder.delivery_address || 'N/A'),
             products: selectedOrder.items.map(item => ({
               name: item.name,
               quantity: item.quantity,
               price: item.price,
             })),
             totalAmount: parseFloat(selectedOrder.total),
-            paymentMethod: selectedOrder.paymentMethod || 'N/A', // Assurez-vous que paymentMethod est disponible
-            status: variables.status.status, // 'delivered'
+            paymentMethod: selectedOrder.methode_paiement || 'N/A', 
+            status: variables.status.status, 
             notes: variables.status.note || '',
-            customerAddress: selectedOrder.deliveryAddress || 'N/A',
-            customerPhone: selectedOrder.phoneNumber || 'N/A',
+            customerAddress: selectedOrder.delivery_address || 'N/A',
+            customerPhone: selectedOrder.phone_number || 'N/A',
           };
           await SalesService.createSale(saleData);
           toast.success('Vente ajoutée à la gestion des ventes');
@@ -251,7 +251,7 @@ const OrdersManagement = () => {
             <TableRow>
               <TableCell>ID Commande</TableCell>
               <TableCell>Date</TableCell>
-              <TableCell>Client</TableCell>
+              <TableCell>Adresse</TableCell>
               <TableCell>Total</TableCell>
               <TableCell>Statut</TableCell>
               <TableCell>Actions</TableCell>
@@ -263,11 +263,11 @@ const OrdersManagement = () => {
               .map((order) => (
                 <TableRow key={order.id}>
                   <TableCell>{order.id}</TableCell>
-                  <TableCell>{formatDate(order.createdAt)}</TableCell>
+                  <TableCell>{formatDate(order.date_creation)}</TableCell>
                   <TableCell>
-                    <Typography variant="body2">{order.deliveryAddress}</Typography>
+                    <Typography variant="body2">{order.delivery_address || 'Adresse non spécifiée'}</Typography>
                     <Typography variant="caption" color="text.secondary">
-                      {order.phoneNumber}
+                      {order.phone_number}
                     </Typography>
                   </TableCell>
                   <TableCell>{parseFloat(order.total).toFixed(2)} GNF</TableCell>
@@ -324,8 +324,8 @@ const OrdersManagement = () => {
                   <Typography variant="h6" gutterBottom>
                     Informations de livraison
                   </Typography>
-                  <Typography>Adresse: {selectedOrder.deliveryAddress}</Typography>
-                  <Typography>Téléphone: {selectedOrder.phoneNumber}</Typography>
+                  <Typography>Adresse: {selectedOrder.delivery_address}</Typography>
+                  <Typography>Téléphone: {selectedOrder.phone_number}</Typography>
                   {selectedOrder.note && (
                     <Typography>Note: {selectedOrder.note}</Typography>
                   )}
